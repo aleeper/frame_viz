@@ -67,7 +67,7 @@ export class Scene {
       frame,
       onChange
     );
-    this.scene.add(control);
+    this.scene.add(control.getHelper());
     this.cleanupFunctions.push(cleanup);
   }
 

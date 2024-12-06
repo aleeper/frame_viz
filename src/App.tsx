@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { JsonEditor } from './components/JsonEditor';
 import { PoseVisualizer } from './components/PoseVisualizer';
+import { RepresentationControl } from './components/RepresentationControl';
 import { Pose, Poses } from './types/Pose';
 import { LayoutGrid } from 'lucide-react';
+import { Representation } from './types/Representation';
 
 const defaultPoses: Poses = [
   {
@@ -24,6 +26,7 @@ const defaultPoses: Poses = [
 
 function App() {
   const [poses, setPoses] = useState<Poses>(defaultPoses);
+  const [representation, setRepresentation] = useState<Representation>("Quaternion");
 
   useEffect(() => {
     if (import.meta.hot) {
@@ -39,7 +42,14 @@ function App() {
         <div className="container mx-auto flex items-center">
           <LayoutGrid className="w-6 h-6 mr-2" />
           <h1 className="text-xl font-bold">3D Pose Visualizer</h1>
+          <div className="flex-grow"></div>
+          <RepresentationControl 
+            value={representation} 
+            onChange={setRepresentation} 
+          />
+        
         </div>
+        
       </header>
 
       <main className="container mx-auto p-4 flex gap-4 h-[calc(100vh-5rem)]">

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { TransformControls as CustomTransformControls } from 'three/examples/jsm/controls/TransformControls';
-// import { CustomTransformControls } from './CustomTransformControls';
+// import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+// import { TransformControls as CustomTransformControls } from 'three/examples/jsm/controls/TransformControls';
+import { OrbitControls } from 'three/addons/controls/OrbitControls';
+import { TransformControls as CustomTransformControls } from 'three/addons/controls/TransformControls';
+// import { TransformControls as CustomTransformControls } from './CustomTransformControls';
 
 export class MyControls {
   private orbitControls: OrbitControls;
@@ -28,18 +30,24 @@ export class MyControls {
     onChange: () => void
   ) {
     const control = new CustomTransformControls(camera, domElement);
-    control.attach(object);
+    // control.attach(object);
     control.addEventListener('dragging-changed', (event) => {
       this.orbitControls.enabled = !event.value;
     });
     control.addEventListener('change', onChange);
-
+    let enabled = false;
     // Add keyboard controls
     const handleKeyDown = (event: KeyboardEvent) => {
       switch (event.key.toLowerCase()) {
         case 'q':
-          control.enabled = !control.enabled;
-          control.visible = control.enabled;
+          enabled = !enabled;
+          // control.enabled = !control.enabled;
+          // control.visible = control.enabled;
+          if (enabled) {
+            control.attach(object);
+          } else {
+            control.detach();
+          }
           break;
         case 'w':
           control.setMode('translate');
@@ -62,6 +70,7 @@ export class MyControls {
 
     const id = object.uuid;
     this.transformControls.set(id, control);
+
 
     return {
       control,

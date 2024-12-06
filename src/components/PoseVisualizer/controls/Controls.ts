@@ -2,8 +2,8 @@ import * as THREE from 'three';
 // import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 // import { TransformControls as CustomTransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { OrbitControls } from 'three/addons/controls/OrbitControls';
-import { TransformControls as CustomTransformControls } from 'three/addons/controls/TransformControls';
-// import { TransformControls as CustomTransformControls } from './CustomTransformControls';
+// import { TransformControls as CustomTransformControls } from 'three/addons/controls/TransformControls';
+import { TransformControls as CustomTransformControls } from './CustomTransformControls';
 
 export class MyControls {
   private orbitControls: OrbitControls;
@@ -30,24 +30,31 @@ export class MyControls {
     onChange: () => void
   ) {
     const control = new CustomTransformControls(camera, domElement);
-    // control.attach(object);
     control.addEventListener('dragging-changed', (event) => {
       this.orbitControls.enabled = !event.value;
     });
-    control.addEventListener('change', onChange);
-    let enabled = false;
+    // control.addEventListener('mouseUp', onChange);
+    // let enabled = false;
+    let space_local = true;
+    control.setSpace('local');
+    control.setSize(0.8);
+    // control.attach(object);
+    // control.setShowX(false);
     // Add keyboard controls
     const handleKeyDown = (event: KeyboardEvent) => {
+      console.log("Controls.keydown");
+      control.removeEventListener('change', onChange);
       switch (event.key.toLowerCase()) {
         case 'q':
-          enabled = !enabled;
+          // enabled = !enabled;
+          // if (enabled) {
+          //   control.attach(object);
+          // } else {
+          //   control.detach();
+          // }
+          // control.setEnabled(enabled);
           // control.enabled = !control.enabled;
           // control.visible = control.enabled;
-          if (enabled) {
-            control.attach(object);
-          } else {
-            control.detach();
-          }
           break;
         case 'w':
           control.setMode('translate');
@@ -58,6 +65,10 @@ export class MyControls {
         // case 'r':
         //   control.setMode('scale');
         //   break;
+        case 's':
+          space_local = !space_local;
+          control.setSpace(space_local ? 'local' : 'world');
+          break;
         case '+':
           control.setSize(Math.min(control.size + 0.1, 2));
           break;
@@ -65,16 +76,18 @@ export class MyControls {
           control.setSize(Math.max(control.size - 0.1, 0.5));
           break;
       }
+      control.addEventListener('change', onChange);
     };
     window.addEventListener('keydown', handleKeyDown);
 
     const id = object.uuid;
     this.transformControls.set(id, control);
 
-
+    control.addEventListener('change', onChange);
     return {
       control,
       cleanup: () => {
+        console.log("Deleting myself!");
         window.removeEventListener('keydown', handleKeyDown);
         control.dispose();
         this.transformControls.delete(id);

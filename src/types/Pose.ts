@@ -4,7 +4,7 @@ export interface Pose {
     y: number;
     z: number;
   };
-  quaternion: {
+  quaternion?: {
     x: number;
     y: number;
     z: number;
@@ -12,3 +12,5 @@ export interface Pose {
   };
   name?: string;
 }
+
+export type Poses = Pose[];

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MyControls } from './controls/Controls';
+import { TransformControls } from './controls/CustomTransformControls';
 
 export class Scene {
   private scene: THREE.Scene;
@@ -7,6 +8,7 @@ export class Scene {
   private renderer: THREE.WebGLRenderer;
   private controls: MyControls;
   private frames: THREE.Group[] = [];
+  private control_list: TransformControls[] = [];
   private cleanupFunctions: (() => void)[] = [];
   private animationFrameId?: number;
 
@@ -68,7 +70,18 @@ export class Scene {
       onChange
     );
     this.scene.add(control.getHelper());
+    this.control_list.push(control);
     this.cleanupFunctions.push(cleanup);
+  }
+
+  public setInteractive(interactive: boolean) {
+    this.control_list.forEach((control, index) => {
+      if (interactive) {
+        control.attach(this.frames[index]);
+      } else {
+        control.detach();
+      }
+    });
   }
 
   public resize(width: number, height: number) {
@@ -80,6 +93,8 @@ export class Scene {
   public clearFrames() {
     this.frames.forEach((frame) => this.scene.remove(frame));
     this.frames = [];
+    this.control_list.forEach((control) => this.scene.remove(control.getHelper()));
+    this.control_list = [];
     this.cleanupFunctions.forEach((cleanup) => cleanup());
     this.cleanupFunctions = [];
   }

@@ -78,6 +78,7 @@ class TransformControls extends Controls {
 						gizmo[ propName ] = value;
 
 						scope.dispatchEvent( { type: propName + '-changed', value: value } );
+						// console.log("dispatch1");
 						scope.dispatchEvent( _changeEvent );
 
 					}
@@ -520,7 +521,7 @@ class TransformControls extends Controls {
 			}
 
 		}
-
+		// console.log("dispatch2");
 		this.dispatchEvent( _changeEvent );
 		this.dispatchEvent( _objectChangeEvent );
 
@@ -581,7 +582,7 @@ class TransformControls extends Controls {
 			this.object.position.copy( this._positionStart );
 			this.object.quaternion.copy( this._quaternionStart );
 			this.object.scale.copy( this._scaleStart );
-
+			// console.log("dispatch3");
 			this.dispatchEvent( _changeEvent );
 			this.dispatchEvent( _objectChangeEvent );
 
@@ -939,17 +940,17 @@ class TransformControlsGizmo extends Object3D {
 		const gizmoTranslate = {
 			X: [
 				[ new Mesh( arrowGeometry, matRed ), [ 0.5, 0, 0 ], [ 0, 0, - Math.PI / 2 ]],
-				[ new Mesh( arrowGeometry, matRed ), [ - 0.5, 0, 0 ], [ 0, 0, Math.PI / 2 ]],
+				// [ new Mesh( arrowGeometry, matRed ), [ - 0.5, 0, 0 ], [ 0, 0, Math.PI / 2 ]],
 				[ new Mesh( lineGeometry2, matRed ), [ 0, 0, 0 ], [ 0, 0, - Math.PI / 2 ]]
 			],
 			Y: [
 				[ new Mesh( arrowGeometry, matGreen ), [ 0, 0.5, 0 ]],
-				[ new Mesh( arrowGeometry, matGreen ), [ 0, - 0.5, 0 ], [ Math.PI, 0, 0 ]],
+				// [ new Mesh( arrowGeometry, matGreen ), [ 0, - 0.5, 0 ], [ Math.PI, 0, 0 ]],
 				[ new Mesh( lineGeometry2, matGreen ) ]
 			],
 			Z: [
 				[ new Mesh( arrowGeometry, matBlue ), [ 0, 0, 0.5 ], [ Math.PI / 2, 0, 0 ]],
-				[ new Mesh( arrowGeometry, matBlue ), [ 0, 0, - 0.5 ], [ - Math.PI / 2, 0, 0 ]],
+				// [ new Mesh( arrowGeometry, matBlue ), [ 0, 0, - 0.5 ], [ - Math.PI / 2, 0, 0 ]],
 				[ new Mesh( lineGeometry2, matBlue ), null, [ Math.PI / 2, 0, 0 ]]
 			],
 			XYZ: [
@@ -1254,7 +1255,8 @@ class TransformControlsGizmo extends Object3D {
 
 			}
 
-			handle.scale.set( 1, 1, 1 ).multiplyScalar( factor * this.size / 4 );
+			// handle.scale.set( 1, 1, 1 ).multiplyScalar( factor * this.size / 4 );
+			handle.scale.set( 1, 1, 1 ).multiplyScalar(this.size * 2);
 
 			// TODO: simplify helpers and consider decoupling from gizmo
 

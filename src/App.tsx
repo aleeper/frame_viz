@@ -5,6 +5,7 @@ import { RepresentationControl } from './components/RepresentationControl';
 import { Pose, Poses } from './types/Pose';
 import { LayoutGrid } from 'lucide-react';
 import { Representation } from './types/Representation';
+import { PoseDisplay } from './components/PoseDisplay';
 
 const defaultPoses: Poses = [
   {
@@ -59,8 +60,11 @@ function App() {
             onChange={setPoses}
           />
         </div>
-        <div className="w-2/3 bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+        <div className="w-1/3 bg-gray-800 rounded-lg shadow-lg space-y-2">
           <PoseVisualizer poses={poses} onChange={setPoses} />
+        </div>
+        <div className="w-1/3 bg-gray-800 rounded-lg shadow-lg space-y-2">
+          <PoseDisplay poses={poses} representation={representation} />
         </div>
       </main>
     </div>

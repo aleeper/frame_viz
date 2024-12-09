@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MyControls } from './controls/Controls';
 import { TransformControls } from './controls/CustomTransformControls';
 import { UpDirection } from '../../types/Representation';
+import { createBaseAxes } from './utils';
 
 export class Scene {
   private scene: THREE.Scene;
@@ -12,9 +13,9 @@ export class Scene {
   private control_list: TransformControls[] = [];
   private cleanupFunctions: (() => void)[] = [];
   private animationFrameId?: number;
-  private gridHelper: THREE.GridHelper;
+  private gridHelper?: THREE.GridHelper;
 
-  constructor(container: HTMLElement, up: UpDirection) {
+  constructor(container: HTMLElement, upDirection: UpDirection) {
     // Setup scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1a1a1a);
@@ -29,7 +30,9 @@ export class Scene {
     this.camera.position.set(5, 5, 5);
     this.camera.lookAt(0, 0, 0);
 
-    this.setUpDirection(up);
+    this.setupScene();
+    this.setUpDirection(upDirection);
+
     // Setup renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
@@ -40,11 +43,13 @@ export class Scene {
     this.controls = new MyControls(this.camera, this.renderer.domElement);
     
     // Setup scene
-    this.setupScene();
     this.animate();
   }
 
   private setupScene() {
+    const baseAxes = createBaseAxes();
+    this.scene.add(baseAxes);
+
     this.gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x444444);
     this.scene.add(this.gridHelper);
 
@@ -55,19 +60,22 @@ export class Scene {
     directionalLight.position.set(5, 5, 5);
     this.scene.add(directionalLight);
   }
-
-  public setUpDirection(up: UpDirection) {
-    if (up == "X") {
+  
+  public setUpDirection(upDirection: UpDirection) {
+    if (upDirection == "X") {
       this.scene.up.set(1, 0, 0);
       this.camera.up.set(1, 0, 0);
-    } else if (up == "Y") {
+      this.gridHelper.rotation.z = Math.PI / 2;
+    } else if (upDirection == "Y") {
       this.scene.up.set(0, 1, 0);
       this.camera.up.set(0, 1, 0);
-    } else if (up == "Z") {
+      // No change to gridHelper.
+    } else if (upDirection == "Z") {
       this.scene.up.set(0, 0, 1);
       this.camera.up.set(0, 0, 1);
+      this.gridHelper.rotation.x = Math.PI / 2;
     } else {
-      console.log("Unrecognized direction: " + up);
+      console.log("Unrecognized direction: " + upDirection);
     }
   }
 

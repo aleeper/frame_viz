@@ -55,7 +55,7 @@ export function PoseVisualizer({ poses, upDirection, onChange }: PoseVisualizerP
   // Setup resize handler for Three.js window.
   useEffect(() => {
     if (!containerRef.current) return;
-
+    setPrevPoses([]);
     const scene = new Scene(containerRef.current, upDirection);
     sceneRef.current = scene;
 
@@ -69,7 +69,7 @@ export function PoseVisualizer({ poses, upDirection, onChange }: PoseVisualizerP
       window.removeEventListener('resize', handleResize);
       scene.dispose();
     };
-  }, []);
+  }, [upDirection]);
 
   useEffect(() => {
     console.log("X");

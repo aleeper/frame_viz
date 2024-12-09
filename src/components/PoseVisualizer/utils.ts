@@ -5,18 +5,18 @@ export function createTextCanvas(text: string) {
   const ctx = canvas.getContext('2d')!;
   canvas.width = 256;
   canvas.height = 256;
-  
+
   ctx.fillStyle = 'white';
   ctx.font = '24px Arial';
   ctx.textAlign = 'center';
   ctx.fillText(text, 128, 128);
-  
+
   return canvas;
 }
 
 export function createFrame(pose: { name?: string; position: THREE.Vector3Like; quaternion: THREE.QuaternionLike }) {
   const frame = new THREE.Group();
-  
+
   // Create a single arrow for each axis with thicker lines
   const axisLength = 1;
   const headLength = 0.2;
@@ -83,5 +83,38 @@ export function createFrame(pose: { name?: string; position: THREE.Vector3Like; 
     frame.add(sprite);
   }
 
+  return frame;
+}
+
+export function createBaseAxes(axisLength: number = 5) {
+  // Create dashed material
+  const createDashedLine = (color: number) =>
+  new THREE.LineDashedMaterial({ color, dashSize: 0.25, gapSize: 0.25, linewidth: 2 });
+  
+  // Geometry for the dashed line.
+  const createLineGeometry = (start: THREE.Vector3, end: THREE.Vector3) => {
+    const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+    geometry.computeBoundingSphere();
+    return geometry;
+  };
+  
+  // X axis (red).
+  const xGeometry = createLineGeometry(new THREE.Vector3(0, 0, 0), new THREE.Vector3(axisLength, 0, 0));
+  const xLine = new THREE.Line(xGeometry, createDashedLine(0xff0000));
+  xLine.computeLineDistances(); // Required for dashed lines
+  
+  // Y axis (green).
+  const yGeometry = createLineGeometry(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, axisLength, 0));
+  const yLine = new THREE.Line(yGeometry, createDashedLine(0x00ff00));
+  yLine.computeLineDistances();
+
+  // Z axis (blue).
+  const zGeometry = createLineGeometry(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, axisLength));
+  const zLine = new THREE.Line(zGeometry, createDashedLine(0x0000ff));
+  zLine.computeLineDistances();
+  
+  // Add lines to the frame.
+  const frame = new THREE.Group();
+  frame.add(xLine, yLine, zLine);
   return frame;
 }

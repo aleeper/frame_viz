@@ -1,4 +1,4 @@
-import { Pose } from "../types/Pose";
+import { Pose } from "../../types/Pose";
 
 interface PositionQuaternionDisplayProps {
     label: string;

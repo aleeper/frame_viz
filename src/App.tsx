@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { JsonEditor } from './components/JsonEditor';
+import { DropdownControl } from './components/DropdownControl';
+import { PoseDisplay } from './components/PoseDisplay';
 import { PoseVisualizer } from './components/PoseVisualizer';
-import { RepresentationControl } from './components/RepresentationControl';
 import { Pose, Poses } from './types/Pose';
 import { LayoutGrid } from 'lucide-react';
 import { Representation, UpDirection } from './types/Representation';
-import { PoseDisplay } from './components/PoseDisplay';
-import { DropdownControl } from './components/DropdownControl';
 
 const defaultPoses: Poses = [
   {
@@ -46,10 +45,6 @@ function App() {
           <LayoutGrid className="w-6 h-6 mr-2" />
           <h1 className="text-xl font-bold">3D Pose Visualizer</h1>
           <div className="flex-grow"></div>
-          {/* <RepresentationControl 
-            value={representation} 
-            onChange={setRepresentation} 
-          /> */}
           <div>
 
             <DropdownControl

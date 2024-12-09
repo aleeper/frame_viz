@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MyControls } from './controls/Controls';
 import { TransformControls } from './controls/CustomTransformControls';
+import { UpDirection } from '../../types/Representation';
 
 export class Scene {
   private scene: THREE.Scene;
@@ -11,8 +12,9 @@ export class Scene {
   private control_list: TransformControls[] = [];
   private cleanupFunctions: (() => void)[] = [];
   private animationFrameId?: number;
+  private gridHelper: THREE.GridHelper;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, up: UpDirection) {
     // Setup scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1a1a1a);
@@ -27,6 +29,7 @@ export class Scene {
     this.camera.position.set(5, 5, 5);
     this.camera.lookAt(0, 0, 0);
 
+    this.setUpDirection(up);
     // Setup renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
@@ -35,15 +38,15 @@ export class Scene {
 
     // Setup controls
     this.controls = new MyControls(this.camera, this.renderer.domElement);
-
+    
     // Setup scene
     this.setupScene();
     this.animate();
   }
 
   private setupScene() {
-    const gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x444444);
-    this.scene.add(gridHelper);
+    this.gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x444444);
+    this.scene.add(this.gridHelper);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambientLight);
@@ -51,6 +54,21 @@ export class Scene {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(5, 5, 5);
     this.scene.add(directionalLight);
+  }
+
+  public setUpDirection(up: UpDirection) {
+    if (up == "X") {
+      this.scene.up.set(1, 0, 0);
+      this.camera.up.set(1, 0, 0);
+    } else if (up == "Y") {
+      this.scene.up.set(0, 1, 0);
+      this.camera.up.set(0, 1, 0);
+    } else if (up == "Z") {
+      this.scene.up.set(0, 0, 1);
+      this.camera.up.set(0, 0, 1);
+    } else {
+      console.log("Unrecognized direction: " + up);
+    }
   }
 
   private animate = () => {

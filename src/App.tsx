@@ -4,8 +4,9 @@ import { PoseVisualizer } from './components/PoseVisualizer';
 import { RepresentationControl } from './components/RepresentationControl';
 import { Pose, Poses } from './types/Pose';
 import { LayoutGrid } from 'lucide-react';
-import { Representation } from './types/Representation';
+import { Representation, UpDirection } from './types/Representation';
 import { PoseDisplay } from './components/PoseDisplay';
+import { DropdownControl } from './components/DropdownControl';
 
 const defaultPoses: Poses = [
   {
@@ -28,6 +29,7 @@ const defaultPoses: Poses = [
 function App() {
   const [poses, setPoses] = useState<Poses>(defaultPoses);
   const [representation, setRepresentation] = useState<Representation>("Quaternion");
+  const [upDirection, setUpDirection] = useState<UpDirection>("Z");
 
   useEffect(() => {
     if (import.meta.hot) {
@@ -44,26 +46,46 @@ function App() {
           <LayoutGrid className="w-6 h-6 mr-2" />
           <h1 className="text-xl font-bold">3D Pose Visualizer</h1>
           <div className="flex-grow"></div>
-          <RepresentationControl 
+          {/* <RepresentationControl 
             value={representation} 
             onChange={setRepresentation} 
-          />
+          /> */}
+          <div>
+
+            <DropdownControl
+              id="ADAM"
+              value={representation}
+              onChange={setRepresentation}
+              options={
+                ["Quaternion", "Matrix"].map((item) => ({ label: item, value: item }))
+              }
+              />
+
+            <DropdownControl
+              id="ADAM"
+              value={upDirection}
+              onChange={setUpDirection}
+              options={
+                ["X", "Y", "Z"].map((item) => ({ label: item, value: item }))
+              }
+              />
+            </div>
         
         </div>
         
       </header>
 
       <main className="container mx-auto p-4 flex gap-4 h-[calc(100vh-5rem)]">
-        <div className="w-1/3 bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+        {/* <div className="w-1/3 bg-gray-800 rounded-lg shadow-lg overflow-hidden">
           <JsonEditor
             value={poses}
             onChange={setPoses}
           />
+        </div> */}
+        <div className="w-1/2 bg-gray-800 rounded-lg shadow-lg space-y-2">
+          <PoseVisualizer poses={poses} onChange={setPoses} upDirection={upDirection} />
         </div>
-        <div className="w-1/3 bg-gray-800 rounded-lg shadow-lg space-y-2">
-          <PoseVisualizer poses={poses} onChange={setPoses} />
-        </div>
-        <div className="w-1/3 bg-gray-800 rounded-lg shadow-lg space-y-2">
+        <div className="w-1/2 bg-gray-800 rounded-lg shadow-lg space-y-2">
           <PoseDisplay poses={poses} representation={representation} />
         </div>
       </main>

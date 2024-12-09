@@ -2,18 +2,21 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { Scene } from './Scene';
 import { createFrame } from './utils';
 import { Pose, Poses } from '../../types/Pose';
+import { UpDirection } from '../../types/Representation';
 
 interface PoseVisualizerProps {
   poses: Poses;
+  upDirection: UpDirection;
   onChange?: (newPoses: Poses) => void;
 }
 
-export function PoseVisualizer({ poses, onChange }: PoseVisualizerProps) {
+export function PoseVisualizer({ poses, upDirection, onChange }: PoseVisualizerProps) {
   console.log("PoseVisualize constructor!");
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene>();
   const [prevPoses, setPrevPoses] = useState([]);
   const [interactive, setInteractive] = useState(false);
+  // const [upDirection, setUpDirection] = useState("Y");
 
   useEffect(() => {
     if (import.meta.hot) {
@@ -53,7 +56,7 @@ export function PoseVisualizer({ poses, onChange }: PoseVisualizerProps) {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const scene = new Scene(containerRef.current);
+    const scene = new Scene(containerRef.current, upDirection);
     sceneRef.current = scene;
 
     const handleResize = () => {
@@ -120,6 +123,11 @@ export function PoseVisualizer({ poses, onChange }: PoseVisualizerProps) {
       window.removeEventListener('keyup', handleKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setUpDirection(upDirection);
+  }, [upDirection]);
   
   
   return (

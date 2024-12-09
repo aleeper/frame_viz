@@ -3,6 +3,7 @@ import { MyControls } from './controls/Controls';
 import { TransformControls } from './controls/CustomTransformControls';
 import { UpDirection } from '../../types/Representation';
 import { createBaseAxes } from './utils';
+import { InteractionState } from './types/InteractionState';
 
 export class Scene {
   private scene: THREE.Scene;
@@ -100,13 +101,26 @@ export class Scene {
     this.cleanupFunctions.push(cleanup);
   }
 
-  public setInteractive(interactive: boolean) {
+  public setInteractionState(interactionState: InteractionState) {
     this.control_list.forEach((control, index) => {
-      if (interactive) {
-        control.attach(this.frames[index]);
-      } else {
-        control.detach();
+      control.detach();
+      switch(interactionState) {
+        case "Off":
+          break;
+        case "Translate":
+          control.attach(this.frames[index]);
+          control.setMode("translate");
+          break;
+        case "Rotate":
+          control.attach(this.frames[index]);
+          control.setMode("rotate");
+          break;
       }
+      // if (interactive) {
+      //   control.attach(this.frames[index]);
+      // } else {
+      //   control.detach();
+      // }
     });
   }
 

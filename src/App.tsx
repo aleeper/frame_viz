@@ -22,7 +22,7 @@ const defaultPoses: Poses = [
 
 function App() {
   const [poses, setPoses] = useState<Poses>(defaultPoses);
-  const [representation, setRepresentation] = useState<Representation>("Quaternion");
+  const [representation, setRepresentation] = useState<Representation>("Matrix");
   const [upDirection, setUpDirection] = useState<UpDirection>("Z");
 
   useEffect(() => {
@@ -40,7 +40,18 @@ function App() {
           <LayoutGrid className="w-6 h-6 mr-2" />
           <h1 className="text-xl font-bold">3D Pose Visualizer</h1>
           <div className="flex-grow"></div>
-          <div className="w-64">
+
+        </div>
+
+      </header>
+
+      <main className="container mx-auto p-4 flex gap-4 h-[calc(100vh-5rem)]">
+        {/* Column with JsonEditor and PoseDisplay */}
+        <div className="flex flex-col w-1/4 bg-gray-800 rounded-lg shadow-lg overflow-hidden space-y-2">
+          <div className="flex-1 bg-gray-800 rounded-lg shadow-lg">
+            <JsonEditor value={poses} onChange={setPoses} />
+          </div>
+          <div className="">
             <div className="flex items-center space-x-2">
               <p className="w-32 text-right">Representation: </p>
               <DropdownControl
@@ -48,7 +59,7 @@ function App() {
                 value={representation}
                 onChange={setRepresentation}
                 options={
-                  ["Quaternion", "Matrix"].map((item) => ({ label: item, value: item }))
+                  ["Quaternion", "Matrix", "Euler (Body ZYX)", "Euler (World XYZ)"].map((item) => ({ label: item, value: item }))
                 }
               />
             </div>
@@ -64,16 +75,6 @@ function App() {
                 }
               />
             </div>
-          </div>
-        </div>
-
-      </header>
-
-      <main className="container mx-auto p-4 flex gap-4 h-[calc(100vh-5rem)]">
-        {/* Column with JsonEditor and PoseDisplay */}
-        <div className="flex flex-col w-1/4 bg-gray-800 rounded-lg shadow-lg overflow-hidden space-y-2">
-          <div className="flex-1 bg-gray-800 rounded-lg shadow-lg">
-            <JsonEditor value={poses} onChange={setPoses} />
           </div>
           <div className="flex-1 bg-gray-800 rounded-lg shadow-lg overflow-y-auto space-y-2">
             <PoseDisplay poses={poses} representation={representation} />

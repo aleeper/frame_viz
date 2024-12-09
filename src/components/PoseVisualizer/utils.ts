@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { Pose } from '../../types/Pose';
+import { UpDirection } from '../../types/Representation';
 
 export function createTextCanvas(text: string) {
   const canvas = document.createElement('canvas');
@@ -14,7 +16,7 @@ export function createTextCanvas(text: string) {
   return canvas;
 }
 
-export function createFrame(pose: { name?: string; position: THREE.Vector3Like; quaternion: THREE.QuaternionLike }) {
+export function createFrame(pose: Pose, upDirection: UpDirection = "Y") {
   const frame = new THREE.Group();
 
   // Create a single arrow for each axis with thicker lines
@@ -77,7 +79,8 @@ export function createFrame(pose: { name?: string; position: THREE.Vector3Like; 
         sizeAttenuation: false
       })
     );
-    sprite.position.y = 1.2;
+    const height = 1.4;
+    sprite.position.set(height * +(upDirection === "X"), height * +(upDirection === "Y"), height * +(upDirection === "Z"),);
     const scale = 0.5;
     sprite.scale.set(scale, scale, scale);
     frame.add(sprite);

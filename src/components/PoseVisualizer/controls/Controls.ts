@@ -33,38 +33,14 @@ export class MyControls {
     control.addEventListener('dragging-changed', (event) => {
       this.orbitControls.enabled = !event.value;
     });
-    // control.addEventListener('mouseUp', onChange);
-    // let enabled = false;
     let space_local = true;
     control.setSpace('local');
     control.setSize(0.8);
-    // control.attach(object);
-    // control.setShowX(false);
     // Add keyboard controls
     const handleKeyDown = (event: KeyboardEvent) => {
       console.log("Controls.keydown");
       control.removeEventListener('change', onChange);
       switch (event.key.toLowerCase()) {
-        case 'q':
-          // enabled = !enabled;
-          // if (enabled) {
-          //   control.attach(object);
-          // } else {
-          //   control.detach();
-          // }
-          // control.setEnabled(enabled);
-          // control.enabled = !control.enabled;
-          // control.visible = control.enabled;
-          break;
-        case 'w':
-          control.setMode('translate');
-          break;
-        case 'e':
-          control.setMode('rotate');
-          break;
-        // case 'r':
-        //   control.setMode('scale');
-        //   break;
         case 's':
           space_local = !space_local;
           control.setSpace(space_local ? 'local' : 'world');
@@ -87,7 +63,7 @@ export class MyControls {
     return {
       control,
       cleanup: () => {
-        console.log("Deleting myself!");
+        // console.log("Deleting myself!");
         window.removeEventListener('keydown', handleKeyDown);
         control.dispose();
         this.transformControls.delete(id);

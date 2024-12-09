@@ -4,6 +4,7 @@ import { Pose, Poses } from '../../types/Pose';
 import { MatrixDisplay } from './MatrixDisplay';
 import { poseToTransformationMatrix } from '../../utils/matrixUtils';
 import { PositionQuaternionDisplay } from './PositionQuaternionDisplay';
+import { EulerAngleDisplay } from './EulerAngleDisplay';
 
 interface PoseDisplayProps {
     poses: Poses;
@@ -21,13 +22,23 @@ export function PoseDisplay({ poses, representation }: PoseDisplayProps) {
                                 matrix={poseToTransformationMatrix(pose)}
                                 label={pose.name} />
                         );
-                    } else {
+                    } else if (representation == "Quaternion") {
                         return (
-                            <PositionQuaternionDisplay 
+                            <PositionQuaternionDisplay
                                 pose={pose}
                                 label={pose.name}
                             />
                         );
+                    } else if (representation.startsWith("Euler")) {
+                        return (
+                            <EulerAngleDisplay
+                                pose={pose}
+                                representation={representation}
+                                label={pose.name}
+                            />
+                        );
+                    } else {
+                        return null;
                     }
                 })
             }

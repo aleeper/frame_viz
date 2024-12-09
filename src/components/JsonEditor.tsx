@@ -1,6 +1,6 @@
 import { Editor } from '@monaco-editor/react';
 import { useCallback, useEffect, useState} from 'react';
-import { Pose, Poses } from '../types/Pose';
+import { Pose, Poses, isValidPose } from '../types/Pose';
 
 interface JsonEditorProps {
   value: Poses;
@@ -23,7 +23,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export function JsonEditor({ value, onChange }: JsonEditorProps) {
   const [localValue, setLocalValue] = useState(JSON.stringify(value, null, 2));
-  const debouncedValue = useDebounce(localValue, 500);
+  const debouncedValue = useDebounce(localValue, 1000);
 
   useEffect(() => {
     console.log("A");
@@ -35,28 +35,15 @@ export function JsonEditor({ value, onChange }: JsonEditorProps) {
     try {
       const poses = JSON.parse(debouncedValue);
       if (Array.isArray(poses)) {
-        onChange(poses);
+        const validPoses = poses.filter(isValidPose);
+        if (validPoses.length === poses.length) {
+          onChange(validPoses);
+        }
       }
     } catch (e) {
       console.error('Invalid JSON');
     }
   }, [debouncedValue, onChange]);
-
-  // const handleEditorChange = useCallback(
-  //   (editorValue: string | undefined) => {
-  //     if (!editorValue) return;
-      
-  //     try {
-  //       const poses = JSON.parse(editorValue);
-  //       if (Array.isArray(poses)) {
-  //         onChange(poses);
-  //       }
-  //     } catch (e) {
-  //       console.error('Invalid JSON');
-  //     }
-  //   },
-  //   [onChange]
-  // );
 
   return (
     <div className="h-full w-full">

@@ -8,7 +8,7 @@ interface MatrixDisplayProps {
 
 export function MatrixDisplay({ matrix, label }: MatrixDisplayProps) {
     return (
-      <div className="bg-white p-4 rounded-lg shadow-md">
+      <div className="bg-white p-2 rounded-lg shadow-md">
         {label && <h3 className="text-lg font-semibold mb-2">{label}</h3>}
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse">

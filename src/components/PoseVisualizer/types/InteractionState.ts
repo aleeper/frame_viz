@@ -1,0 +1,1 @@
+export type InteractionState = "Off" | "Translate" | "Rotate";

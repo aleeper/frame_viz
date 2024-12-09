@@ -9,20 +9,15 @@ import { Representation, UpDirection } from './types/Representation';
 
 const defaultPoses: Poses = [
   {
-    name: "Origin",
+    name: "Pose1",
     position: { x: 0, y: 0, z: 0 },
     quaternion: { x: 0, y: 0, z: 0, w: 1 }
   },
   {
-    name: "Pose 1",
-    position: { x: 2, y: 0, z: 0 },
-    quaternion: { x: 0, y: 0.383, z: 0, w: 0.924 }
-  },
-  {
     name: "Pose 2",
-    position: { x: 0, y: 0, z: 2 },
-    quaternion: { x: 0.383, y: 0, z: 0, w: 0.924 }
-  }
+    position: { x: 2, y: 0, z: 0 },
+    quaternion: { x: 0, y: 0, z: -0.383, w: 0.924 }
+  },
 ];
 
 function App() {
@@ -45,43 +40,49 @@ function App() {
           <LayoutGrid className="w-6 h-6 mr-2" />
           <h1 className="text-xl font-bold">3D Pose Visualizer</h1>
           <div className="flex-grow"></div>
-          <div>
-
-            <DropdownControl
-              id="ADAM"
-              value={representation}
-              onChange={setRepresentation}
-              options={
-                ["Quaternion", "Matrix"].map((item) => ({ label: item, value: item }))
-              }
-              />
-
-            <DropdownControl
-              id="ADAM"
-              value={upDirection}
-              onChange={setUpDirection}
-              options={
-                ["X", "Y", "Z"].map((item) => ({ label: item, value: item }))
-              }
+          <div className="w-64">
+            <div className="flex items-center space-x-2">
+              <p className="w-32 text-right">Representation: </p>
+              <DropdownControl
+                id="ADAM"
+                value={representation}
+                onChange={setRepresentation}
+                options={
+                  ["Quaternion", "Matrix"].map((item) => ({ label: item, value: item }))
+                }
               />
             </div>
-        
+
+            <div className="flex items-center space-x-2">
+              <p className="w-32 text-right">Up Direction: </p>
+              <DropdownControl
+                id="ADAM"
+                value={upDirection}
+                onChange={setUpDirection}
+                options={
+                  ["X", "Y", "Z"].map((item) => ({ label: item, value: item }))
+                }
+              />
+            </div>
+          </div>
         </div>
-        
+
       </header>
 
       <main className="container mx-auto p-4 flex gap-4 h-[calc(100vh-5rem)]">
-        {/* <div className="w-1/3 bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-          <JsonEditor
-            value={poses}
-            onChange={setPoses}
-          />
-        </div> */}
-        <div className="w-1/2 bg-gray-800 rounded-lg shadow-lg space-y-2">
-          <PoseVisualizer poses={poses} onChange={setPoses} upDirection={upDirection} />
+        {/* Column with JsonEditor and PoseDisplay */}
+        <div className="flex flex-col w-1/4 bg-gray-800 rounded-lg shadow-lg overflow-hidden space-y-2">
+          <div className="flex-1 bg-gray-800 rounded-lg shadow-lg">
+            <JsonEditor value={poses} onChange={setPoses} />
+          </div>
+          <div className="flex-1 bg-gray-800 rounded-lg shadow-lg overflow-y-auto space-y-2">
+            <PoseDisplay poses={poses} representation={representation} />
+          </div>
         </div>
-        <div className="w-1/2 bg-gray-800 rounded-lg shadow-lg space-y-2">
-          <PoseDisplay poses={poses} representation={representation} />
+
+        {/* Middle Column */}
+        <div className="w-3/4 bg-gray-800 rounded-lg shadow-lg space-y-2">
+          <PoseVisualizer poses={poses} onChange={setPoses} upDirection={upDirection} />
         </div>
       </main>
     </div>

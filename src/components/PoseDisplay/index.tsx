@@ -18,15 +18,14 @@ export function PoseDisplay({ poses, representation }: PoseDisplayProps) {
                     if (representation == "Matrix") {
                         return (
                             <MatrixDisplay
-                                key={index}
                                 matrix={poseToTransformationMatrix(pose)}
                                 label={pose.name} />
                         );
                     } else {
                         return (
                             <PositionQuaternionDisplay 
-                                label={String(index)}
                                 pose={pose}
+                                label={pose.name}
                             />
                         );
                     }

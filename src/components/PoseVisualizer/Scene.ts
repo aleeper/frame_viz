@@ -42,7 +42,7 @@ export class Scene {
 
     // Setup controls
     this.controls = new MyControls(this.camera, this.renderer.domElement);
-    
+
     // Setup scene
     this.animate();
   }
@@ -61,18 +61,15 @@ export class Scene {
     directionalLight.position.set(5, 5, 5);
     this.scene.add(directionalLight);
   }
-  
+
   public setUpDirection(upDirection: UpDirection) {
     if (upDirection == "X") {
-      this.scene.up.set(1, 0, 0);
       this.camera.up.set(1, 0, 0);
       this.gridHelper.rotation.z = Math.PI / 2;
     } else if (upDirection == "Y") {
-      this.scene.up.set(0, 1, 0);
       this.camera.up.set(0, 1, 0);
       // No change to gridHelper.
     } else if (upDirection == "Z") {
-      this.scene.up.set(0, 0, 1);
       this.camera.up.set(0, 0, 1);
       this.gridHelper.rotation.x = Math.PI / 2;
     } else {

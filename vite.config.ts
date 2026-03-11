@@ -8,6 +8,16 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   base: '/frame_viz',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+          monaco: ['@monaco-editor/react'],
+        },
+      },
+    },
+  },
   server: {
     allowedHosts: ['a2824'],
   },

@@ -15,6 +15,11 @@ export class Scene {
   private cleanupFunctions: (() => void)[] = [];
   private animationFrameId?: number;
   private gridHelper?: THREE.GridHelper;
+  private lastActiveMode: 'Translate' | 'Rotate' = 'Translate';
+
+  // Called when click interactions change the interaction mode.
+  // PoseVisualizer sets this to keep React state in sync.
+  public onInteractionStateChange: ((state: InteractionState) => void) | null = null;
 
   constructor(container: HTMLElement, upDirection: UpDirection) {
     // Setup scene
@@ -42,6 +47,14 @@ export class Scene {
 
     // Setup controls
     this.controls = new MyControls(this.camera, this.renderer.domElement);
+    this.controls.onActivate = () => {
+      this.setInteractionState(this.lastActiveMode);
+      this.onInteractionStateChange?.(this.lastActiveMode);
+    };
+    this.controls.onDeactivate = () => {
+      this.setInteractionState('Off');
+      this.onInteractionStateChange?.('Off');
+    };
 
     // Setup scene
     this.animate();
@@ -96,9 +109,16 @@ export class Scene {
     this.scene.add(control.getHelper());
     this.control_list.push(control);
     this.cleanupFunctions.push(cleanup);
+
+    this.controls.setFrames(this.frames);
   }
 
   public setInteractionState(interactionState: InteractionState) {
+    if (interactionState !== 'Off') {
+      this.lastActiveMode = interactionState;
+    }
+    this.controls.interactionActive = interactionState !== 'Off';
+
     this.control_list.forEach((control, index) => {
       control.detach();
       switch(interactionState) {
@@ -113,11 +133,6 @@ export class Scene {
           control.setMode("rotate");
           break;
       }
-      // if (interactive) {
-      //   control.attach(this.frames[index]);
-      // } else {
-      //   control.detach();
-      // }
     });
   }
 
@@ -134,6 +149,8 @@ export class Scene {
     this.control_list = [];
     this.cleanupFunctions.forEach((cleanup) => cleanup());
     this.cleanupFunctions = [];
+
+    this.controls.setFrames(this.frames);
   }
 
   public dispose() {

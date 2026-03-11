@@ -969,16 +969,16 @@ class TransformControlsGizmo extends Object3D {
 
 		const pickerTranslate = {
 			X: [
-				[ new Mesh( new CylinderGeometry( 0.2, 0, 0.6, 4 ), matInvisible ), [ 0.3, 0, 0 ], [ 0, 0, - Math.PI / 2 ]],
-				[ new Mesh( new CylinderGeometry( 0.2, 0, 0.6, 4 ), matInvisible ), [ - 0.3, 0, 0 ], [ 0, 0, Math.PI / 2 ]]
+				[ new Mesh( new CylinderGeometry( 0.13, 0, 0.6, 4 ), matInvisible ), [ 0.3, 0, 0 ], [ 0, 0, - Math.PI / 2 ]],
+				[ new Mesh( new CylinderGeometry( 0.13, 0, 0.3, 4 ), matInvisible ), [ - 0.15, 0, 0 ], [ 0, 0, Math.PI / 2 ]]
 			],
 			Y: [
-				[ new Mesh( new CylinderGeometry( 0.2, 0, 0.6, 4 ), matInvisible ), [ 0, 0.3, 0 ]],
-				[ new Mesh( new CylinderGeometry( 0.2, 0, 0.6, 4 ), matInvisible ), [ 0, - 0.3, 0 ], [ 0, 0, Math.PI ]]
+				[ new Mesh( new CylinderGeometry( 0.13, 0, 0.6, 4 ), matInvisible ), [ 0, 0.3, 0 ]],
+				[ new Mesh( new CylinderGeometry( 0.13, 0, 0.3, 4 ), matInvisible ), [ 0, - 0.15, 0 ], [ 0, 0, Math.PI ]]
 			],
 			Z: [
-				[ new Mesh( new CylinderGeometry( 0.2, 0, 0.6, 4 ), matInvisible ), [ 0, 0, 0.3 ], [ Math.PI / 2, 0, 0 ]],
-				[ new Mesh( new CylinderGeometry( 0.2, 0, 0.6, 4 ), matInvisible ), [ 0, 0, - 0.3 ], [ - Math.PI / 2, 0, 0 ]]
+				[ new Mesh( new CylinderGeometry( 0.13, 0, 0.6, 4 ), matInvisible ), [ 0, 0, 0.3 ], [ Math.PI / 2, 0, 0 ]],
+				[ new Mesh( new CylinderGeometry( 0.13, 0, 0.3, 4 ), matInvisible ), [ 0, 0, - 0.15 ], [ - Math.PI / 2, 0, 0 ]]
 			],
 			XYZ: [
 				[ new Mesh( new OctahedronGeometry( 0.2, 0 ), matInvisible ) ]

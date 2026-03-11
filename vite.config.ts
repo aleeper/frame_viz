@@ -8,4 +8,7 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   base: '/frame_viz',
+  server: {
+    allowedHosts: ['a2824'],
+  },
 });

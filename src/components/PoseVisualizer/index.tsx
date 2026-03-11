@@ -59,6 +59,7 @@ export function PoseVisualizer({ poses, upDirection, onChange }: PoseVisualizerP
     setPrevPoses([]);
     const scene = new Scene(containerRef.current, upDirection);
     sceneRef.current = scene;
+    scene.onInteractionStateChange = (state) => setInteractionState(state);
 
     const handleResize = () => {
       if (!containerRef.current) return;

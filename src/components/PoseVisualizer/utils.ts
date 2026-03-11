@@ -62,6 +62,38 @@ export function createFrame(pose: Pose, upDirection: UpDirection = "Y") {
 
   frame.add(xArrow, yArrow, zArrow);
 
+  // Invisible hit-zone cylinders for each axis.
+  // Positive extent matches the arrow length (1.0); negative extent is half
+  // that (0.5) so clicking slightly behind the origin still works but the
+  // hit region doesn't surprise the user when frames are close together.
+  const hitRadius = 0.10;
+  const hitPosExtent = 1.0;
+  const hitNegExtent = 0.5;
+  const hitLength = hitPosExtent + hitNegExtent;
+  const hitCenterOffset = (hitPosExtent - hitNegExtent) / 2; // 0.25 from origin
+
+  const hitGeo = new THREE.CylinderGeometry(hitRadius, hitRadius, hitLength, 8);
+  const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+
+  const hitZone = new THREE.Group();
+  hitZone.name = 'hitZone';
+
+  const xHit = new THREE.Mesh(hitGeo, hitMat);
+  xHit.rotation.z = -Math.PI / 2;
+  xHit.position.x = hitCenterOffset;
+  hitZone.add(xHit);
+
+  const yHit = new THREE.Mesh(hitGeo, hitMat);
+  yHit.position.y = hitCenterOffset;
+  hitZone.add(yHit);
+
+  const zHit = new THREE.Mesh(hitGeo, hitMat);
+  zHit.rotation.x = Math.PI / 2;
+  zHit.position.z = hitCenterOffset;
+  hitZone.add(zHit);
+
+  frame.add(hitZone);
+
   // Set position and rotation
   frame.position.set(pose.position.x, pose.position.y, pose.position.z);
   frame.quaternion.set(

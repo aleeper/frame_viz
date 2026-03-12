@@ -25,6 +25,7 @@ function App() {
   const [representation, setRepresentation] = useState<Representation>("Matrix");
   const [upDirection, setUpDirection] = useState<UpDirection>("Z");
   const [viewMode, setViewMode] = useState<'panels' | 'yaml'>('panels');
+  const [showWorldAxes, setShowWorldAxes] = useState(true);
 
   const handleAdd = useCallback(() =>
     setPoses(prev => [...prev, {
@@ -82,6 +83,15 @@ function App() {
                   options={["X", "Y", "Z"].map((item) => ({ label: item, value: item }))}
                 />
               </div>
+              <label className="flex items-center gap-2 px-2 py-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showWorldAxes}
+                  onChange={e => setShowWorldAxes(e.target.checked)}
+                  className="accent-blue-500"
+                />
+                <span className="text-gray-600 text-xs">World axes</span>
+              </label>
             </div>
           </div>
 
@@ -133,7 +143,7 @@ function App() {
 
         {/* Middle Column */}
         <div className="w-3/4 bg-gray-800 rounded-lg shadow-lg space-y-2">
-          <PoseVisualizer poses={poses} onChange={setPoses} upDirection={upDirection} />
+          <PoseVisualizer poses={poses} onChange={setPoses} upDirection={upDirection} showWorldAxes={showWorldAxes} />
         </div>
       </main>
     </div>

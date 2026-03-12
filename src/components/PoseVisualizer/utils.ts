@@ -122,34 +122,35 @@ export function createFrame(pose: Pose, upDirection: UpDirection = "Y") {
 }
 
 export function createBaseAxes(axisLength: number = 5) {
-  // Create dashed material
-  const createDashedLine = (color: number) =>
-  new THREE.LineDashedMaterial({ color, dashSize: 0.25, gapSize: 0.25, linewidth: 2 });
-  
-  // Geometry for the dashed line.
-  const createLineGeometry = (start: THREE.Vector3, end: THREE.Vector3) => {
-    const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-    geometry.computeBoundingSphere();
-    return geometry;
-  };
-  
-  // X axis (red).
-  const xGeometry = createLineGeometry(new THREE.Vector3(0, 0, 0), new THREE.Vector3(axisLength, 0, 0));
-  const xLine = new THREE.Line(xGeometry, createDashedLine(0xff0000));
-  xLine.computeLineDistances(); // Required for dashed lines
-  
-  // Y axis (green).
-  const yGeometry = createLineGeometry(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, axisLength, 0));
-  const yLine = new THREE.Line(yGeometry, createDashedLine(0x00ff00));
-  yLine.computeLineDistances();
+  const shaftRadius = 0.01;
+  const headLength = 0.4;
+  const headRadius = 0.12;
+  const shaftLength = axisLength - headLength;
 
-  // Z axis (blue).
-  const zGeometry = createLineGeometry(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, axisLength));
-  const zLine = new THREE.Line(zGeometry, createDashedLine(0x0000ff));
-  zLine.computeLineDistances();
-  
-  // Add lines to the frame.
+  const makeAxis = (color: number, quat: THREE.Quaternion) => {
+    const mat = new THREE.MeshLambertMaterial({ color });
+    const group = new THREE.Group();
+
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 8), mat);
+    shaft.position.y = shaftLength / 2;
+    group.add(shaft);
+
+    const head = new THREE.Mesh(new THREE.ConeGeometry(headRadius, headLength, 8), mat);
+    head.position.y = shaftLength + headLength / 2;
+    group.add(head);
+
+    group.quaternion.copy(quat);
+    return group;
+  };
+
+  // Rotate each group so its local Y points along the desired world axis.
+  const xQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+  const yQuat = new THREE.Quaternion(); // identity — Y is already up
+  const zQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+
   const frame = new THREE.Group();
-  frame.add(xLine, yLine, zLine);
+  frame.add(makeAxis(0xff3333, xQuat));
+  frame.add(makeAxis(0x33ff33, yQuat));
+  frame.add(makeAxis(0x3333ff, zQuat));
   return frame;
 }

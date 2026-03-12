@@ -15,6 +15,7 @@ export class Scene {
   private cleanupFunctions: (() => void)[] = [];
   private animationFrameId?: number;
   private gridHelper?: THREE.GridHelper;
+  private baseAxes?: THREE.Group;
   private lastActiveMode: 'Translate' | 'Rotate' = 'Translate';
 
   // Called when click interactions change the interaction mode.
@@ -61,8 +62,8 @@ export class Scene {
   }
 
   private setupScene() {
-    const baseAxes = createBaseAxes();
-    this.scene.add(baseAxes);
+    this.baseAxes = createBaseAxes();
+    this.scene.add(this.baseAxes);
 
     this.gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x444444);
     this.scene.add(this.gridHelper);
@@ -73,6 +74,10 @@ export class Scene {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(5, 5, 5);
     this.scene.add(directionalLight);
+  }
+
+  public setWorldAxesVisible(visible: boolean) {
+    if (this.baseAxes) this.baseAxes.visible = visible;
   }
 
   public setUpDirection(upDirection: UpDirection) {

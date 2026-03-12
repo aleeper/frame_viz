@@ -8,10 +8,11 @@ import { InteractionState } from './types/InteractionState';
 interface PoseVisualizerProps {
   poses: Poses;
   upDirection: UpDirection;
+  showWorldAxes?: boolean;
   onChange?: (newPoses: Poses) => void;
 }
 
-export function PoseVisualizer({ poses, upDirection, onChange }: PoseVisualizerProps) {
+export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onChange }: PoseVisualizerProps) {
   // console.log("PoseVisualize constructor!");
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene>();
@@ -137,6 +138,11 @@ export function PoseVisualizer({ poses, upDirection, onChange }: PoseVisualizerP
     if (!sceneRef.current) return;
     sceneRef.current.setUpDirection(upDirection);
   }, [upDirection]);
+
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setWorldAxesVisible(showWorldAxes);
+  }, [showWorldAxes]);
 
 
   return (

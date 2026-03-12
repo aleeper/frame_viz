@@ -20,5 +20,8 @@ export default defineConfig({
   },
   server: {
     allowedHosts: ['a2824'],
+    watch: {
+      ignored: ['**/docs/**', '**/.superpowers/**'],
+    },
   },
 });

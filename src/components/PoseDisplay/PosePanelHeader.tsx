@@ -26,9 +26,9 @@ export function PosePanelHeader({
   };
 
   return (
-    <div className="flex items-center justify-between px-2 pt-1 pb-0">
+    <div className="flex items-center justify-between px-2 pt-1 pb-1 bg-white border-b border-gray-200">
       <input
-        className="bg-transparent text-white text-sm font-semibold flex-1 min-w-0 outline-none border-b border-transparent focus:border-gray-500 transition-colors"
+        className="bg-transparent text-gray-800 text-sm font-semibold flex-1 min-w-0 outline-none border-b border-transparent focus:border-gray-400 transition-colors placeholder:text-gray-400"
         value={editValue}
         placeholder={fallbackLabel}
         onChange={e => setEditValue(e.target.value)}
@@ -37,7 +37,7 @@ export function PosePanelHeader({
       />
       {onRemove && (
         <button
-          className="ml-2 text-gray-500 hover:text-red-400 transition-colors text-xs leading-none"
+          className="ml-2 text-gray-400 hover:text-red-500 transition-colors text-xs leading-none"
           onClick={onRemove}
           aria-label="Remove pose"
         >

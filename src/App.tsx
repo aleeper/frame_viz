@@ -24,6 +24,7 @@ function App() {
   const [poses, setPoses] = useState<Poses>(defaultPoses);
   const [representation, setRepresentation] = useState<Representation>("Matrix");
   const [upDirection, setUpDirection] = useState<UpDirection>("Z");
+  const [viewMode, setViewMode] = useState<'panels' | 'yaml'>('panels');
 
   const handleAdd = useCallback(() =>
     setPoses(prev => [...prev, {
@@ -64,26 +65,35 @@ function App() {
       </header>
 
       <main className="container mx-auto p-4 flex gap-4 h-[calc(100vh-5rem)]">
-        {/* Column with JsonEditor and PoseDisplay */}
-        <div className="flex flex-col w-1/4 bg-gray-800 rounded-lg shadow-lg overflow-hidden space-y-2">
-          <div className="flex-1 bg-gray-800 rounded-lg shadow-lg">
-            <JsonEditor value={poses} onChange={setPoses} />
-          </div>
-          <div className="">
-            <div className="flex items-center space-x-2">
-              <p className="w-32 text-right">Representation: </p>
-              <DropdownControl
-                id="ADAM"
-                value={representation}
-                onChange={setRepresentation}
-                options={
-                  ["Quaternion", "Matrix", "Euler (Body ZYX)", "Euler (World XYZ)"].map((item) => ({ label: item, value: item }))
-                }
-              />
+        {/* Left column */}
+        <div className="flex flex-col w-1/4 bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+          {/* Toggle + settings bar */}
+          <div className="flex flex-col gap-1 px-2 pt-2 pb-1 shrink-0">
+            <div className="flex bg-gray-700 rounded p-0.5">
+              <button
+                className={`flex-1 text-xs py-1 rounded transition-colors ${viewMode === 'panels' ? 'bg-gray-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                onClick={() => setViewMode('panels')}
+              >Panels</button>
+              <button
+                className={`flex-1 text-xs py-1 rounded transition-colors ${viewMode === 'yaml' ? 'bg-gray-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                onClick={() => setViewMode('yaml')}
+              >YAML</button>
             </div>
-
+            {viewMode === 'panels' && (
+              <div className="flex items-center space-x-2">
+                <p className="w-32 text-right text-xs">Representation: </p>
+                <DropdownControl
+                  id="ADAM"
+                  value={representation}
+                  onChange={setRepresentation}
+                  options={
+                    ["Quaternion", "Matrix", "Euler (Body ZYX)", "Euler (World XYZ)"].map((item) => ({ label: item, value: item }))
+                  }
+                />
+              </div>
+            )}
             <div className="flex items-center space-x-2">
-              <p className="w-32 text-right">Up Direction: </p>
+              <p className="w-32 text-right text-xs">Up Direction: </p>
               <DropdownControl
                 id="ADAM"
                 value={upDirection}
@@ -94,15 +104,23 @@ function App() {
               />
             </div>
           </div>
-          <div className="flex-1 bg-gray-800 rounded-lg shadow-lg overflow-y-auto space-y-2">
-            <PoseDisplay
-              poses={poses}
-              representation={representation}
-              onAdd={handleAdd}
-              onRemove={handleRemove}
-              onRename={handleRename}
-            />
-          </div>
+
+          {/* Main content area */}
+          {viewMode === 'yaml' ? (
+            <div className="flex-1 overflow-hidden">
+              <JsonEditor value={poses} onChange={setPoses} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+              <PoseDisplay
+                poses={poses}
+                representation={representation}
+                onAdd={handleAdd}
+                onRemove={handleRemove}
+                onRename={handleRename}
+              />
+            </div>
+          )}
         </div>
 
         {/* Middle Column */}

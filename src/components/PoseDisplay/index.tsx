@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react';
 import { Representation } from '../../types/Representation';
-import { Pose, Poses } from '../../types/Pose';
+import { Poses } from '../../types/Pose';
 import { MatrixDisplay } from './MatrixDisplay';
 import { poseToTransformationMatrix } from '../../utils/matrixUtils';
 import { PositionQuaternionDisplay } from './PositionQuaternionDisplay';
@@ -20,7 +21,7 @@ export function PoseDisplay({ poses, representation, onAdd, onRemove, onRename }
       {poses.map((pose, index) => {
         const fallbackLabel = `Pose ${index + 1}`;
 
-        let display: React.ReactNode = null;
+        let display: ReactNode = null;
         if (representation === 'Matrix') {
           display = <MatrixDisplay matrix={poseToTransformationMatrix(pose)} />;
         } else if (representation === 'Quaternion') {

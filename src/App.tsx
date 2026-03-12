@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { JsonEditor } from './components/JsonEditor';
 import { DropdownControl } from './components/DropdownControl';
 import { PoseDisplay } from './components/PoseDisplay';
 import { PoseVisualizer } from './components/PoseVisualizer';
-import { Pose, Poses } from './types/Pose';
+import { Poses } from './types/Pose';
 import { LayoutGrid } from 'lucide-react';
 import { Representation, UpDirection } from './types/Representation';
 
@@ -25,23 +25,23 @@ function App() {
   const [representation, setRepresentation] = useState<Representation>("Matrix");
   const [upDirection, setUpDirection] = useState<UpDirection>("Z");
 
-  const handleAdd = () =>
+  const handleAdd = useCallback(() =>
     setPoses(prev => [...prev, {
       position: { x: 0, y: 0, z: 0 },
       quaternion: { x: 0, y: 0, z: 0, w: 1 },
-    }]);
+    }]), []);
 
-  const handleRemove = (index: number) =>
-    setPoses(prev => prev.filter((_, i) => i !== index));
+  const handleRemove = useCallback((index: number) =>
+    setPoses(prev => prev.filter((_, i) => i !== index)), []);
 
   // Destructuring removes the `name` key entirely when clearing, so the
   // serialized JSON never contains `name: undefined` as an explicit property.
-  const handleRename = (index: number, name: string | undefined) =>
+  const handleRename = useCallback((index: number, name: string | undefined) =>
     setPoses(prev => prev.map((pose, i) => {
       if (i !== index) return pose;
       const { name: _removed, ...rest } = pose;
       return name !== undefined ? { ...rest, name } : rest;
-    }));
+    })), []);
 
   useEffect(() => {
     if (import.meta.hot) {

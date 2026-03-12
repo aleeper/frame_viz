@@ -1,5 +1,5 @@
 import { Editor } from '@monaco-editor/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pose, Poses, isValidPose } from '../types/Pose';
 
 interface JsonEditorProps {
@@ -25,21 +25,27 @@ export function JsonEditor({ value, onChange }: JsonEditorProps) {
   const [localValue, setLocalValue] = useState(JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
   const debouncedValue = useDebounce(localValue, 1000);
+  // Track the last external value so we can skip calling onChange when the
+  // editor content just reflects an undo/redo rather than a user edit.
+  const externalValueRef = useRef(value);
+  externalValueRef.current = value;
 
   useEffect(() => {
-    console.log("A");
     setLocalValue(JSON.stringify(value, null, 2));
   }, [value]);
 
   useEffect(() => {
-    console.log("B");
     try {
       const poses = JSON.parse(debouncedValue);
       if (Array.isArray(poses)) {
         const validPoses = poses.filter(isValidPose);
         if (validPoses.length === poses.length) {
-          onChange(validPoses);
-          setError(null); // Clear the error if JSON is valid
+          // Skip if content matches the external value — this debounce fired
+          // because an undo/redo updated localValue, not because the user typed.
+          if (JSON.stringify(validPoses) !== JSON.stringify(externalValueRef.current)) {
+            onChange(validPoses);
+          }
+          setError(null);
         } else {
           setError('Some elements are not valid Pose objects.');
         }

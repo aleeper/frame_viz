@@ -10,7 +10,7 @@ export class Scene {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private controls: MyControls;
-  private frames: THREE.Group[] = [];
+  public frames: THREE.Group[] = [];
   private control_list: TransformControls[] = [];
   private cleanupFunctions: (() => void)[] = [];
   private animationFrameId?: number;
@@ -21,6 +21,10 @@ export class Scene {
   // Called when click interactions change the interaction mode.
   // PoseVisualizer sets this to keep React state in sync.
   public onInteractionStateChange: ((state: InteractionState) => void) | null = null;
+
+  // Called once after a drag gesture completes. PoseVisualizer wires this to
+  // push a history snapshot.
+  public onDragCommit: (() => void) | null = null;
 
   constructor(container: HTMLElement, upDirection: UpDirection) {
     // Setup scene
@@ -56,6 +60,7 @@ export class Scene {
       this.setInteractionState('Off');
       this.onInteractionStateChange?.('Off');
     };
+    this.controls.onDragCommit = () => this.onDragCommit?.();
 
     // Setup scene
     this.animate();

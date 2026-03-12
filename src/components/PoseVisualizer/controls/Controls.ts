@@ -32,6 +32,8 @@ export class MyControls {
   public onActivate: (() => void) | null = null;
   // Called when a click (no drag) should deactivate interaction mode.
   public onDeactivate: (() => void) | null = null;
+  // Called once on pointer-up after a real drag completes (not a click).
+  public onDragCommit: (() => void) | null = null;
 
   constructor(camera: THREE.Camera, domElement: HTMLElement) {
     this.camera = camera;
@@ -181,6 +183,9 @@ export class MyControls {
 
     if (this.activeDragControl !== null) {
       this.activeDragControl.pointerUp(this.getPointer(event));
+      if (this._hasDragged) {
+        this.onDragCommit?.();
+      }
       this.activeDragControl = null;
     }
 

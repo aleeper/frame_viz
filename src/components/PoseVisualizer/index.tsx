@@ -10,12 +10,15 @@ interface PoseVisualizerProps {
   upDirection: UpDirection;
   showWorldAxes?: boolean;
   onChange?: (newPoses: Poses) => void;
+  onChangeCommit?: (newPoses: Poses) => void;
 }
 
-export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onChange }: PoseVisualizerProps) {
+export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onChange, onChangeCommit }: PoseVisualizerProps) {
   // console.log("PoseVisualize constructor!");
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene>();
+  const posesRef = useRef<Poses>(poses);
+  posesRef.current = poses;
   const [prevPoses, setPrevPoses] = useState([]);
   const [interactionState, setInteractionState] = useState<InteractionState>("Off");
   // const [upDirection, setUpDirection] = useState("Y");
@@ -29,13 +32,14 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
   }, []);
 
   // Callback for pose updates from the Three.js window.
-  const handleTransformChange = () => {
-    // console.log("Z");
+  // Uses posesRef so it can be stable (not recreated each render).
+  const handleTransformChange = useCallback(() => {
     if (!sceneRef.current || !onChange) return;
 
     const scene = sceneRef.current;
+    const currentPoses = posesRef.current;
     const newPoses = scene.frames.map((frame, index) => ({
-      ...poses[index],
+      ...currentPoses[index],
       position: {
         x: frame.position.x,
         y: frame.position.y,
@@ -48,11 +52,11 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
         w: frame.quaternion.w,
       },
     }));
-    if (JSON.stringify(newPoses) != JSON.stringify(poses)) {
+    if (JSON.stringify(newPoses) !== JSON.stringify(currentPoses)) {
       setPrevPoses(newPoses);
       onChange(newPoses);
     }
-  };
+  }, [onChange]);
 
   // Setup resize handler for Three.js window.
   useEffect(() => {
@@ -77,12 +81,8 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
   useEffect(() => {
     // console.log("X");
     if (!sceneRef.current) return;
-    let posesString = JSON.stringify(poses);
-    let prevPosesString = JSON.stringify(prevPoses);
-    if (posesString == prevPosesString) {
-      // console.log("Same poses, skipping update.");
-      return;
-    }
+    if (poses === prevPoses) return;
+    if (JSON.stringify(poses) === JSON.stringify(prevPoses)) return;
 
     const scene = sceneRef.current;
     scene.clearFrames();
@@ -90,9 +90,25 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
       const frame = createFrame(pose, upDirection);
       scene.addFrame(frame, handleTransformChange);
     });
+    setPrevPoses(poses);
     // console.log("Setting interactionState: " + interactionState);
     scene.setInteractionState(interactionState);
-  }, [poses, handleTransformChange]);
+    scene.onDragCommit = () => {
+      if (!onChangeCommit) return;
+      const currentPoses = posesRef.current;
+      const newPoses = scene.frames.map((frame, index) => ({
+        ...currentPoses[index],
+        position: { x: frame.position.x, y: frame.position.y, z: frame.position.z },
+        quaternion: {
+          x: frame.quaternion.x,
+          y: frame.quaternion.y,
+          z: frame.quaternion.z,
+          w: frame.quaternion.w,
+        },
+      }));
+      onChangeCommit(newPoses);
+    };
+  }, [poses, handleTransformChange, onChangeCommit]);
 
   useEffect(() => {
     let isKeyDown = false;

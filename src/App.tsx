@@ -4,7 +4,9 @@ import { DropdownControl } from './components/DropdownControl';
 import { PoseDisplay } from './components/PoseDisplay';
 import { PoseVisualizer } from './components/PoseVisualizer';
 import { Poses } from './types/Pose';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, Undo2, Redo2 } from 'lucide-react';
+import { useUndoRedo } from './hooks/useUndoRedo';
+import type { AppSnapshot } from './types/AppSnapshot';
 import { Representation, UpDirection } from './types/Representation';
 
 const defaultPoses: Poses = [
@@ -21,37 +23,54 @@ const defaultPoses: Poses = [
 ];
 
 function App() {
-  const [poses, setPoses] = useState<Poses>(defaultPoses);
+  const { snapshot, set, undo, redo, canUndo, canRedo } =
+    useUndoRedo<AppSnapshot>({ poses: defaultPoses });
+  const [dragPoses, setDragPoses] = useState<Poses | null>(null);
+  const poses = dragPoses ?? snapshot.poses;
+  const handleDragChange = useCallback((p: Poses) => setDragPoses(p), []);
+  const handleDragCommit = useCallback((p: Poses) => { set({ poses: p }); setDragPoses(null); }, [set]);
+  const handleJsonChange = useCallback((p: Poses) => set({ poses: p }), [set]);
   const [representation, setRepresentation] = useState<Representation>("Matrix");
   const [upDirection, setUpDirection] = useState<UpDirection>("Z");
   const [viewMode, setViewMode] = useState<'panels' | 'yaml'>('panels');
   const [showWorldAxes, setShowWorldAxes] = useState(true);
 
   const handleAdd = useCallback(() =>
-    setPoses(prev => [...prev, {
+    set({ poses: [...poses, {
       position: { x: 0, y: 0, z: 0 },
       quaternion: { x: 0, y: 0, z: 0, w: 1 },
-    }]), []);
+    }] }), [poses, set]);
 
   const handleRemove = useCallback((index: number) =>
-    setPoses(prev => prev.filter((_, i) => i !== index)), []);
+    set({ poses: poses.filter((_, i) => i !== index) }), [poses, set]);
 
   // Destructuring removes the `name` key entirely when clearing, so the
   // serialized JSON never contains `name: undefined` as an explicit property.
   const handleRename = useCallback((index: number, name: string | undefined) =>
-    setPoses(prev => prev.map((pose, i) => {
+    set({ poses: poses.map((pose, i) => {
       if (i !== index) return pose;
       const { name: _removed, ...rest } = pose;
       return name !== undefined ? { ...rest, name } : rest;
-    })), []);
+    }) }), [poses, set]);
 
   useEffect(() => {
     if (import.meta.hot) {
       import.meta.hot.accept(() => {
-        setPoses(defaultPoses); // Reset poses to ensure reinitialization.
+        set({ poses: defaultPoses }); // Reset poses to ensure reinitialization.
       });
     }
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if      (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+      else if (mod && e.shiftKey  && e.key.toLowerCase() === 'z') { e.preventDefault(); redo(); }
+      else if (mod && !e.shiftKey && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -60,6 +79,26 @@ function App() {
           <LayoutGrid className="w-6 h-6 mr-2" />
           <h1 className="text-xl font-bold">3D Pose Visualizer</h1>
           <div className="flex-grow"></div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={undo}
+              disabled={!canUndo}
+              aria-disabled={!canUndo}
+              aria-label="Undo"
+              className={`p-1.5 rounded transition-colors ${canUndo ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-gray-600 cursor-not-allowed'}`}
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={redo}
+              disabled={!canRedo}
+              aria-disabled={!canRedo}
+              aria-label="Redo"
+              className={`p-1.5 rounded transition-colors ${canRedo ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-gray-600 cursor-not-allowed'}`}
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          </div>
 
         </div>
 
@@ -125,7 +164,7 @@ function App() {
           {/* Main content area */}
           {viewMode === 'yaml' ? (
             <div className="flex-1 overflow-hidden">
-              <JsonEditor value={poses} onChange={setPoses} />
+              <JsonEditor value={poses} onChange={handleJsonChange} />
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -143,7 +182,13 @@ function App() {
 
         {/* Middle Column */}
         <div className="w-3/4 bg-gray-800 rounded-lg shadow-lg space-y-2">
-          <PoseVisualizer poses={poses} onChange={setPoses} upDirection={upDirection} showWorldAxes={showWorldAxes} />
+          <PoseVisualizer
+            poses={poses}
+            onChange={handleDragChange}
+            onChangeCommit={handleDragCommit}
+            upDirection={upDirection}
+            showWorldAxes={showWorldAxes}
+          />
         </div>
       </main>
     </div>

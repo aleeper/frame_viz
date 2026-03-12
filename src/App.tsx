@@ -25,6 +25,24 @@ function App() {
   const [representation, setRepresentation] = useState<Representation>("Matrix");
   const [upDirection, setUpDirection] = useState<UpDirection>("Z");
 
+  const handleAdd = () =>
+    setPoses(prev => [...prev, {
+      position: { x: 0, y: 0, z: 0 },
+      quaternion: { x: 0, y: 0, z: 0, w: 1 },
+    }]);
+
+  const handleRemove = (index: number) =>
+    setPoses(prev => prev.filter((_, i) => i !== index));
+
+  // Destructuring removes the `name` key entirely when clearing, so the
+  // serialized JSON never contains `name: undefined` as an explicit property.
+  const handleRename = (index: number, name: string | undefined) =>
+    setPoses(prev => prev.map((pose, i) => {
+      if (i !== index) return pose;
+      const { name: _removed, ...rest } = pose;
+      return name !== undefined ? { ...rest, name } : rest;
+    }));
+
   useEffect(() => {
     if (import.meta.hot) {
       import.meta.hot.accept(() => {
@@ -77,7 +95,13 @@ function App() {
             </div>
           </div>
           <div className="flex-1 bg-gray-800 rounded-lg shadow-lg overflow-y-auto space-y-2">
-            <PoseDisplay poses={poses} representation={representation} />
+            <PoseDisplay
+              poses={poses}
+              representation={representation}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+              onRename={handleRename}
+            />
           </div>
         </div>
 

@@ -126,6 +126,11 @@ interface PinnedEntryProps {
   onRemove: (id: string) => void;
 }
 
+function toFrameLabel(name: string): string {
+  if (name.includes(' ')) return name.toLowerCase().replace(/\s+/g, '_');
+  return name.charAt(0).toLowerCase() + name.slice(1);
+}
+
 function PinnedEntry({ expr, poses, frameMap, representation, onRemove }: PinnedEntryProps) {
   const baseFrame = poses.find(p => p.id === expr.base_frame_id);
   const targetFrame = poses.find(p => p.id === expr.target_frame_id);
@@ -136,8 +141,8 @@ function PinnedEntry({ expr, poses, frameMap, representation, onRemove }: Pinned
 
   const [collapsed, setCollapsed] = useState(false);
 
-  const baseName = baseFrame?.name ?? expr.base_frame_id;
-  const targetName = targetFrame?.name ?? expr.target_frame_id;
+  const baseName = toFrameLabel(baseFrame?.name ?? expr.base_frame_id);
+  const targetName = toFrameLabel(targetFrame?.name ?? expr.target_frame_id);
   const label = `${baseName}_T_${targetName}`;
 
   // Compute: base_T_target = invert(global_T_base) × global_T_target

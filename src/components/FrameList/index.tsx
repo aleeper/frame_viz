@@ -10,6 +10,14 @@ import { buildDisplayList, getValidParents, PANEL_MAX_INDENT_DEPTH } from './fra
 
 export type ReparentMode = 'preserve world' | 'preserve numbers';
 
+// Converts a human-readable frame name to a label suitable for a_T_b notation.
+// Names with spaces are fully lowercased with spaces → underscores ("Frame B" → "frame_b").
+// CamelCase names (no spaces) get only the first char lowercased ("FrameB" → "frameB").
+function toFrameLabel(name: string): string {
+  if (name.includes(' ')) return name.toLowerCase().replace(/\s+/g, '_');
+  return name.charAt(0).toLowerCase() + name.slice(1);
+}
+
 interface FrameListProps {
   poses: Poses;
   representation: Representation;
@@ -125,10 +133,10 @@ export function FrameList({
                 <div className="text-xs text-gray-300 mb-1">
                   {pose.parent_id ? (
                     <span className="font-mono">
-                      {(poses.find(p => p.id === pose.parent_id)?.name ?? pose.parent_id)}_T_{pose.name ?? pose.id}
+                      {toFrameLabel(poses.find(p => p.id === pose.parent_id)?.name ?? pose.parent_id)}_T_{toFrameLabel(pose.name ?? pose.id)}
                     </span>
                   ) : (
-                    <span className="font-mono">global_T_{pose.name ?? pose.id}</span>
+                    <span className="font-mono">global_T_{toFrameLabel(pose.name ?? pose.id)}</span>
                   )}
                 </div>
                 {renderPoseData(pose, representation, pose.name ?? pose.id, parentName ?? 'global')}

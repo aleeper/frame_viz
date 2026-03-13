@@ -37,7 +37,12 @@ const defaultPoses: Poses = [
 
 function App() {
   const { snapshot, set, undo, redo, canUndo, canRedo } =
-    useUndoRedo<AppSnapshot>({ poses: defaultPoses, pinnedExpressions: [] });
+    useUndoRedo<AppSnapshot>({
+      poses: defaultPoses,
+      pinnedExpressions: [
+        { id: 'pin1xxxx', base_frame_id: 'frame1xxx', target_frame_id: 'frameBxxx', kind: 'transform' },
+      ],
+    });
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
   const [dragPoses, setDragPoses] = useState<Poses | null>(null);

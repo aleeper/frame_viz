@@ -55,8 +55,8 @@ export function EulerAngleDisplay({ pose, representation, label }: EulerAngleDis
     }
 
     return (
-        <div className="bg-white p-2 rounded-lg shadow-md">
-            {label && <h3 className="text-sm font-semibold text-gray-700 mb-2">{label}</h3>}
+        <div className="p-1">
+            {label && <h3 className="text-sm font-semibold text-gray-300 mb-2">{label}</h3>}
             <table className="min-w-full border-collapse">
                 <tbody>
                     <tr>

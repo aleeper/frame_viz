@@ -9,12 +9,12 @@ export function PositionQuaternionDisplay({ pose, label }: PositionQuaternionDis
     const { position, quaternion } = pose;
 
     return (
-      <div className="bg-white p-2 rounded-lg shadow-md">
+      <div className="p-1">
         {label && <h3 className="text-lg font-semibold mb-2">{label}</h3>}
         <div className="flex space-x-8">
           {/* Quaternion Column */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-1 text-center">Quaternion</h4>
+            <h4 className="text-sm font-semibold text-gray-300 mb-1 text-center">Quaternion</h4>
             <table className="min-w-full border-collapse">
               <tbody>
                 <tr>
@@ -39,7 +39,7 @@ export function PositionQuaternionDisplay({ pose, label }: PositionQuaternionDis
 
           {/* Position Vector Column */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2 text-center">Position</h4>
+            <h4 className="text-sm font-semibold text-gray-300 mb-2 text-center">Position</h4>
             <table className="min-w-full border-collapse">
               <tbody>
                 <tr>

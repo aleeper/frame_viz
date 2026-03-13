@@ -4,6 +4,7 @@ import { createFrame } from './utils';
 import { Pose, Poses } from '../../types/Pose';
 import { UpDirection } from '../../types/Representation';
 import { InteractionState } from './types/InteractionState';
+import { composePath, posesToMap, multiply, invert } from '../../utils/transforms';
 
 interface PoseVisualizerProps {
   poses: Poses;
@@ -38,21 +39,42 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
 
     const scene = sceneRef.current;
     const currentPoses = posesRef.current;
-    const newPoses = scene.frames.map((frame, index) => ({
-      ...currentPoses[index],
-      position: {
-        x: frame.position.x,
-        y: frame.position.y,
-        z: frame.position.z,
-      },
-      quaternion: {
-        x: frame.quaternion.x,
-        y: frame.quaternion.y,
-        z: frame.quaternion.z,
-        w: frame.quaternion.w,
-      },
-    }));
+    const frameMap = posesToMap(currentPoses);
+
+    const newPoses = scene.frames.map((frame, index) => {
+      const pose = currentPoses[index];
+      const worldPos = { x: frame.position.x, y: frame.position.y, z: frame.position.z };
+      const worldQuat = { x: frame.quaternion.x, y: frame.quaternion.y, z: frame.quaternion.z, w: frame.quaternion.w };
+
+      if (pose.parent_id) {
+        // Convert world transform → parent-relative.
+        const global_T_parent = composePath(pose.parent_id, frameMap);
+        const world_T_frame = { ...pose, position: worldPos, quaternion: worldQuat };
+        const parent_T_frame = multiply(invert(global_T_parent), world_T_frame);
+        return { ...pose, position: parent_T_frame.position, quaternion: parent_T_frame.quaternion };
+      } else {
+        return { ...pose, position: worldPos, quaternion: worldQuat };
+      }
+    });
+
     if (JSON.stringify(newPoses) !== JSON.stringify(currentPoses)) {
+      // Update world positions of all frames so children follow their parents live.
+      const newFrameMap = posesToMap(newPoses);
+      scene.frames.forEach((threeFrame, index) => {
+        const pose = newPoses[index];
+        const global_T_frame = composePath(pose.id, newFrameMap);
+        threeFrame.position.set(
+          global_T_frame.position.x,
+          global_T_frame.position.y,
+          global_T_frame.position.z,
+        );
+        threeFrame.quaternion.set(
+          global_T_frame.quaternion.x,
+          global_T_frame.quaternion.y,
+          global_T_frame.quaternion.z,
+          global_T_frame.quaternion.w,
+        );
+      });
       setPrevPoses(newPoses);
       onChange(newPoses);
     }
@@ -86,8 +108,12 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
 
     const scene = sceneRef.current;
     scene.clearFrames();
+    const frameMap = posesToMap(poses);
     poses.forEach((pose) => {
-      const frame = createFrame(pose, upDirection);
+      // Compute world pose — scene is flat, all groups live at the scene root.
+      const global_T_frame = composePath(pose.id, frameMap);
+      const worldPose = { ...pose, position: global_T_frame.position, quaternion: global_T_frame.quaternion };
+      const frame = createFrame(worldPose, upDirection);
       scene.addFrame(frame, handleTransformChange);
     });
     setPrevPoses(poses);
@@ -96,16 +122,23 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
     scene.onDragCommit = () => {
       if (!onChangeCommit) return;
       const currentPoses = posesRef.current;
-      const newPoses = scene.frames.map((frame, index) => ({
-        ...currentPoses[index],
-        position: { x: frame.position.x, y: frame.position.y, z: frame.position.z },
-        quaternion: {
-          x: frame.quaternion.x,
-          y: frame.quaternion.y,
-          z: frame.quaternion.z,
-          w: frame.quaternion.w,
-        },
-      }));
+      const frameMap = posesToMap(currentPoses);
+
+      const newPoses = scene.frames.map((frame, index) => {
+        const pose = currentPoses[index];
+        const worldPos = { x: frame.position.x, y: frame.position.y, z: frame.position.z };
+        const worldQuat = { x: frame.quaternion.x, y: frame.quaternion.y, z: frame.quaternion.z, w: frame.quaternion.w };
+
+        if (pose.parent_id) {
+          const global_T_parent = composePath(pose.parent_id, frameMap);
+          const world_T_frame = { ...pose, position: worldPos, quaternion: worldQuat };
+          const parent_T_frame = multiply(invert(global_T_parent), world_T_frame);
+          return { ...pose, position: parent_T_frame.position, quaternion: parent_T_frame.quaternion };
+        } else {
+          return { ...pose, position: worldPos, quaternion: worldQuat };
+        }
+      });
+
       onChangeCommit(newPoses);
     };
   }, [poses, handleTransformChange, onChangeCommit]);

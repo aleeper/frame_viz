@@ -10,7 +10,7 @@ export function MatrixDisplay({ matrix, label }: MatrixDisplayProps) {
     const rowLabels = ["Wx", "Wy", "Wz", ""];
     const columnLabels = ["", "Fx", "Fy", "Fz", ""];
     return (
-      <div className="bg-white p-2 rounded-lg shadow-md">
+      <div className="p-1">
         {label && <h3 className="text-lg font-semibold mb-2">{label}</h3>}
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse">
@@ -23,8 +23,8 @@ export function MatrixDisplay({ matrix, label }: MatrixDisplayProps) {
                     <td
                       key={j}
                       className={`px-2 py-1 text-right font-mono ${
-                        j === 3 || j === 0 ? 'border-l border-gray-300' : ''
-                      } ${i === 3 || i === 0 ? 'border-t border-gray-300' : ''}`}
+                        j === 3 || j === 0 ? 'border-l border-gray-600' : ''
+                      } ${i === 3 || i === 0 ? 'border-t border-gray-600' : ''}`}
                     >
                       {value.toFixed(4)}
                     </td>

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { JsonEditor } from './components/JsonEditor';
 import { DropdownControl } from './components/DropdownControl';
-import { PoseDisplay } from './components/PoseDisplay';
+import { FrameList, ReparentMode } from './components/FrameList';
+import { composePath, posesToMap, multiply, invert } from './utils/transforms';
 import { PoseVisualizer } from './components/PoseVisualizer';
 import { Poses } from './types/Pose';
 import { LayoutGrid, Undo2, Redo2 } from 'lucide-react';
@@ -37,25 +38,75 @@ function App() {
   const [upDirection, setUpDirection] = useState<UpDirection>("Z");
   const [viewMode, setViewMode] = useState<'panels' | 'yaml'>('panels');
   const [showWorldAxes, setShowWorldAxes] = useState(true);
+  const [reparentMode, setReparentMode] = useState<ReparentMode>('preserve world');
+  const [rightPanel, setRightPanel] = useState<'pinned' | null>(null);
 
-  const handleAdd = useCallback(() =>
-    set({ poses: [...poses, {
+  const handleAdd = useCallback(() => {
+    const usedNames = new Set(poses.map(p => p.name));
+    let i = 1;
+    while (usedNames.has(`Frame ${i}`)) i++;
+    set({ ...snapshot, poses: [...poses, {
       id: nanoid(8),
+      name: `Frame ${i}`,
       position: { x: 0, y: 0, z: 0 },
       quaternion: { x: 0, y: 0, z: 0, w: 1 },
-    }] }), [poses, set]);
+    }] });
+  }, [snapshot, poses, set]);
 
-  const handleRemove = useCallback((index: number) =>
-    set({ poses: poses.filter((_, i) => i !== index) }), [poses, set]);
+  const handleRemove = useCallback((id: string) => {
+    set({
+      poses: poses
+        .filter(p => p.id !== id)
+        .map(p => p.parent_id === id ? { ...p, parent_id: undefined } : p),
+    });
+  }, [poses, set]);
 
   // Destructuring removes the `name` key entirely when clearing, so the
   // serialized JSON never contains `name: undefined` as an explicit property.
-  const handleRename = useCallback((index: number, name: string | undefined) =>
-    set({ poses: poses.map((pose, i) => {
-      if (i !== index) return pose;
-      const { name: _removed, ...rest } = pose;
-      return name !== undefined ? { ...rest, name } : rest;
-    }) }), [poses, set]);
+  const handleRename = useCallback((id: string, name: string | undefined) =>
+    set({
+      poses: poses.map(pose => {
+        if (pose.id !== id) return pose;
+        const { name: _removed, ...rest } = pose;
+        return name !== undefined ? { ...rest, name } : rest;
+      }),
+    }), [poses, set]);
+
+  const handleSetParent = useCallback((id: string, newParentId: string | undefined) => {
+    set({
+      poses: poses.map(pose => {
+        if (pose.id !== id) return pose;
+
+        if (reparentMode === 'preserve world') {
+          const frameMap = posesToMap(poses);
+          const global_T_frame = composePath(id, frameMap);
+
+          if (newParentId !== undefined) {
+            const global_T_new_parent = composePath(newParentId, frameMap);
+            const new_parent_T_frame = multiply(invert(global_T_new_parent), global_T_frame);
+            return {
+              ...pose,
+              parent_id: newParentId,
+              position: new_parent_T_frame.position,
+              quaternion: new_parent_T_frame.quaternion,
+            };
+          } else {
+            const { parent_id: _removed, ...rest } = pose;
+            return {
+              ...rest,
+              position: global_T_frame.position,
+              quaternion: global_T_frame.quaternion,
+            };
+          }
+        }
+
+        // preserve local
+        return newParentId !== undefined
+          ? { ...pose, parent_id: newParentId }
+          : (() => { const { parent_id: _removed, ...rest } = pose; return rest; })();
+      }),
+    });
+  }, [poses, set, reparentMode]);
 
   useEffect(() => {
     if (import.meta.hot) {
@@ -108,17 +159,17 @@ function App() {
 
       </header>
 
-      <main className="container mx-auto p-4 flex gap-4 h-[calc(100vh-5rem)]">
+      <main className="p-4 flex gap-4 h-[calc(100vh-5rem)]">
         {/* Left column */}
-        <div className="flex flex-col w-1/4 bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+        <div className="flex flex-col w-80 bg-gray-800 rounded-lg shadow-lg overflow-hidden shrink-0">
           {/* Scene Options */}
           <div className="shrink-0 px-2 pt-2 pb-1">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="px-2 py-1 border-b border-gray-200">
-                <span className="text-gray-500 text-xs font-semibold uppercase tracking-wide">Scene Options</span>
+            <div className="bg-gray-700 rounded-lg overflow-hidden">
+              <div className="px-2 py-1 border-b border-gray-600">
+                <span className="text-gray-300 text-xs font-semibold uppercase tracking-wide">Scene Options</span>
               </div>
               <div className="flex items-center gap-2 px-2 py-1.5">
-                <p className="text-gray-600 text-xs shrink-0">Up Direction</p>
+                <p className="text-gray-300 text-xs shrink-0">Up Direction</p>
                 <DropdownControl
                   id="up-direction"
                   value={upDirection}
@@ -133,7 +184,7 @@ function App() {
                   onChange={e => setShowWorldAxes(e.target.checked)}
                   className="accent-blue-500"
                 />
-                <span className="text-gray-600 text-xs">World axes</span>
+                <span className="text-gray-300 text-xs">World axes</span>
               </label>
             </div>
           </div>
@@ -151,17 +202,30 @@ function App() {
               >YAML</button>
             </div>
             {viewMode === 'panels' && (
-              <div className="flex items-center space-x-2">
-                <p className="w-32 text-right text-xs">Representation: </p>
-                <DropdownControl
-                  id="representation"
-                  value={representation}
-                  onChange={setRepresentation}
-                  options={
-                    ["Quaternion", "Matrix", "Euler (Body ZYX)", "Euler (World XYZ)"].map((item) => ({ label: item, value: item }))
-                  }
-                />
-              </div>
+              <>
+                <div className="flex items-center space-x-2">
+                  <p className="w-32 text-right text-xs">Representation: </p>
+                  <DropdownControl
+                    id="representation"
+                    value={representation}
+                    onChange={setRepresentation}
+                    options={
+                      ["Quaternion", "Matrix", "Euler (Body ZYX)", "Euler (World XYZ)"].map((item) => ({ label: item, value: item }))
+                    }
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <p className="w-32 text-right text-xs">Re-parent: </p>
+                  <select
+                    className="text-xs border border-gray-600 rounded bg-gray-700 text-white px-1 py-0.5"
+                    value={reparentMode}
+                    onChange={e => setReparentMode(e.target.value as ReparentMode)}
+                  >
+                    <option value="preserve world">preserve world</option>
+                    <option value="preserve local">preserve local</option>
+                  </select>
+                </div>
+              </>
             )}
           </div>
 
@@ -172,12 +236,14 @@ function App() {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
-              <PoseDisplay
+              <FrameList
                 poses={poses}
                 representation={representation}
+                reparentMode={reparentMode}
                 onAdd={handleAdd}
                 onRemove={handleRemove}
                 onRename={handleRename}
+                onSetParent={handleSetParent}
               />
             </div>
           )}
@@ -185,7 +251,7 @@ function App() {
         </div>
 
         {/* Middle Column */}
-        <div className="w-3/4 bg-gray-800 rounded-lg shadow-lg space-y-2">
+        <div className="flex-1 min-w-0 bg-gray-800 rounded-lg shadow-lg space-y-2">
           <PoseVisualizer
             poses={poses}
             onChange={handleDragChange}
@@ -193,6 +259,40 @@ function App() {
             upDirection={upDirection}
             showWorldAxes={showWorldAxes}
           />
+        </div>
+
+        {/* Right panel (Spec D content goes here) */}
+        {rightPanel !== null && (
+          <div className="w-48 bg-gray-800 rounded-lg shadow-lg flex flex-col overflow-hidden shrink-0">
+            <div className="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
+              <span className="text-xs font-bold text-purple-400 uppercase tracking-wide">
+                {rightPanel === 'pinned' ? 'Pinned' : rightPanel}
+              </span>
+              <button
+                className="text-gray-500 hover:text-white text-xs"
+                onClick={() => setRightPanel(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 p-2 text-xs text-gray-500 italic">
+              Coming in Spec D…
+            </div>
+          </div>
+        )}
+
+        {/* Activity bar */}
+        <div className="w-8 bg-gray-800 border border-gray-700 rounded-lg shadow-lg flex flex-col items-center py-2 gap-1 shrink-0">
+          <button
+            title="Pinned expressions"
+            className={`w-6 h-6 flex items-center justify-center rounded text-sm transition-colors
+              ${rightPanel === 'pinned'
+                ? 'bg-gray-700 text-blue-400'
+                : 'text-gray-500 hover:text-gray-200'}`}
+            onClick={() => setRightPanel(p => p === 'pinned' ? null : 'pinned')}
+          >
+            ⇄
+          </button>
         </div>
       </main>
     </div>

@@ -8,14 +8,17 @@ import { LayoutGrid, Undo2, Redo2 } from 'lucide-react';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import type { AppSnapshot } from './types/AppSnapshot';
 import { Representation, UpDirection } from './types/Representation';
+import { nanoid } from 'nanoid';
 
 const defaultPoses: Poses = [
   {
+    id: 'pose1aaa',
     name: "Pose1",
     position: { x: 0, y: 0, z: 0 },
     quaternion: { x: 0, y: 0, z: 0, w: 1 }
   },
   {
+    id: 'pose2bbb',
     name: "Pose 2",
     position: { x: 2, y: 0, z: 0 },
     quaternion: { x: 0, y: 0, z: -0.383, w: 0.924 }
@@ -37,6 +40,7 @@ function App() {
 
   const handleAdd = useCallback(() =>
     set({ poses: [...poses, {
+      id: nanoid(8),
       position: { x: 0, y: 0, z: 0 },
       quaternion: { x: 0, y: 0, z: 0, w: 1 },
     }] }), [poses, set]);

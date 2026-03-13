@@ -1,4 +1,7 @@
 export interface Pose {
+  id: string;           // stable, auto-generated (nanoid 8 chars). Never changes after creation.
+  name?: string;        // display only, user-editable
+  parent_id?: string;   // references another Pose's id. Absent = root in global space.
   position: {
     x: number;
     y: number;
@@ -10,7 +13,6 @@ export interface Pose {
     z: number;
     w: number;
   };
-  name?: string;
 }
 
 export type Poses = Pose[];
@@ -21,6 +23,7 @@ export function isValidPose(pose: any): pose is Pose {
   return (
     typeof pose === 'object' &&
     pose !== null &&
+    typeof pose.id === 'string' &&
     typeof pose.position === 'object' &&
     pose.position !== null &&
     typeof pose.position.x === 'number' &&
@@ -32,6 +35,7 @@ export function isValidPose(pose: any): pose is Pose {
     typeof pose.quaternion.y === 'number' &&
     typeof pose.quaternion.z === 'number' &&
     typeof pose.quaternion.w === 'number' &&
-    (pose.name === undefined || typeof pose.name === 'string')
+    (pose.name === undefined || typeof pose.name === 'string') &&
+    (pose.parent_id === undefined || typeof pose.parent_id === 'string')
   );
 }

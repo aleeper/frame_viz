@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Scene } from './Scene';
+import type { CameraState } from './Scene';
 import { createFrame } from './utils';
 import { Pose, Poses } from '../../types/Pose';
 import { UpDirection } from '../../types/Representation';
@@ -23,9 +24,11 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
   posesRef.current = poses;
   const [prevPoses, setPrevPoses] = useState([]);
   const [interactionState, setInteractionState] = useState<InteractionState>("Off");
-  // Incremented each time the scene is recreated (e.g. upDirection change).
+  // Incremented each time the scene is recreated (e.g. after up-direction animation).
   // Adding it to the frames effect deps ensures frames are rebuilt on the new scene.
-  const [sceneVersion, setSceneVersion] = useState(0);
+  const [sceneKey, setSceneKey] = useState(0);
+  // Saved camera state to restore position/orientation after scene recreation.
+  const cameraStateRef = useRef<CameraState | null>(null);
   // const [upDirection, setUpDirection] = useState("Y");
 
   useEffect(() => {
@@ -93,14 +96,20 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
     }
   }, [onChange]);
 
-  // Setup resize handler for Three.js window.
+  // Create (or recreate) the scene. Triggered on mount and after each
+  // up-direction animation via sceneKey. Uses saved camera state when available.
   useEffect(() => {
     if (!containerRef.current) return;
-    setPrevPoses([]);
-    setSceneVersion(v => v + 1);
-    const scene = new Scene(containerRef.current, upDirection);
+    const state = cameraStateRef.current;
+    cameraStateRef.current = null;
+    const scene = new Scene(containerRef.current, upDirection, state ?? undefined);
     sceneRef.current = scene;
-    scene.onInteractionStateChange = (state) => setInteractionState(state);
+    scene.onInteractionStateChange = (s) => setInteractionState(s);
+    scene.onUpAnimComplete = () => {
+      cameraStateRef.current = scene.getCameraState();
+      setSceneKey(k => k + 1);
+      setPrevPoses([]);
+    };
 
     const handleResize = () => {
       if (!containerRef.current) return;
@@ -112,7 +121,8 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
       window.removeEventListener('resize', handleResize);
       scene.dispose();
     };
-  }, [upDirection]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sceneKey]);
 
   useEffect(() => {
     // console.log("X");
@@ -168,7 +178,7 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
 
       onChangeCommit(newPoses);
     };
-  }, [poses, handleTransformChange, onChangeCommit, sceneVersion]);
+  }, [poses, handleTransformChange, onChangeCommit, sceneKey]);
 
   useEffect(() => {
     let isKeyDown = false;

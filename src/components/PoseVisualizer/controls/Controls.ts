@@ -289,6 +289,18 @@ export class MyControls {
     };
   }
 
+  public getOrbitTarget(): THREE.Vector3 {
+    return this.orbitControls.target.clone();
+  }
+
+  public setOrbitTarget(target: THREE.Vector3): void {
+    this.orbitControls.target.copy(target);
+  }
+
+  public setOrbitEnabled(enabled: boolean): void {
+    this.orbitControls.enabled = enabled;
+  }
+
   public update() {
     this.orbitControls.update();
   }

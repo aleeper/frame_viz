@@ -5,6 +5,12 @@ import { UpDirection } from '../../types/Representation';
 import { createBaseAxes } from './utils';
 import { InteractionState } from './types/InteractionState';
 
+interface ParentLine {
+  line: THREE.Line;
+  childIndex: number;
+  parentIndex: number;
+}
+
 export class Scene {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -17,6 +23,7 @@ export class Scene {
   private gridHelper?: THREE.GridHelper;
   private baseAxes?: THREE.Group;
   private lastActiveMode: 'Translate' | 'Rotate' = 'Translate';
+  private parentLinesGroup = new THREE.Group();
 
   // Called when click interactions change the interaction mode.
   // PoseVisualizer sets this to keep React state in sync.
@@ -69,6 +76,7 @@ export class Scene {
   private setupScene() {
     this.baseAxes = createBaseAxes();
     this.scene.add(this.baseAxes);
+    this.scene.add(this.parentLinesGroup);
 
     this.gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x444444);
     this.scene.add(this.gridHelper);
@@ -103,8 +111,38 @@ export class Scene {
   private animate = () => {
     this.animationFrameId = requestAnimationFrame(this.animate);
     this.controls.update();
+    this.updateParentLines();
     this.renderer.render(this.scene, this.camera);
   };
+
+  private updateParentLines(): void {
+    const children = this.parentLinesGroup.children as THREE.Line[];
+    // parentLinesGroup.children lines are in the same order as addParentLine calls
+    children.forEach((line, i) => {
+      const userData = line.userData as { childIndex: number; parentIndex: number };
+      const child = this.frames[userData.childIndex];
+      const parent = this.frames[userData.parentIndex];
+      if (!child || !parent) return;
+      const attr = line.geometry.getAttribute('position') as THREE.BufferAttribute;
+      attr.setXYZ(0, parent.position.x, parent.position.y, parent.position.z);
+      attr.setXYZ(1, child.position.x, child.position.y, child.position.z);
+      attr.needsUpdate = true;
+    });
+  }
+
+  public addParentLine(childIndex: number, parentIndex: number): void {
+    const positions = new Float32Array(6); // 2 points × 3 coords
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.LineBasicMaterial({ color: 0x999999, transparent: true, opacity: 0.45 });
+    const line = new THREE.Line(geometry, material);
+    line.userData = { childIndex, parentIndex };
+    this.parentLinesGroup.add(line);
+  }
+
+  public setParentLinesVisible(visible: boolean): void {
+    this.parentLinesGroup.visible = visible;
+  }
 
   public addFrame(frame: THREE.Group, onChange: () => void) {
     this.scene.add(frame);
@@ -116,11 +154,16 @@ export class Scene {
       frame,
       onChange
     );
+    this.controls.registerFrameIndex(control, this.frames.length - 1);
     this.scene.add(control.getHelper());
     this.control_list.push(control);
     this.cleanupFunctions.push(cleanup);
 
     this.controls.setFrames(this.frames);
+  }
+
+  public getDraggedFrameIndex(): number {
+    return this.controls.getDraggedFrameIndex();
   }
 
   public setInteractionState(interactionState: InteractionState) {
@@ -159,6 +202,13 @@ export class Scene {
     this.control_list = [];
     this.cleanupFunctions.forEach((cleanup) => cleanup());
     this.cleanupFunctions = [];
+    // Dispose parent line geometries/materials and clear the group.
+    this.parentLinesGroup.children.forEach((obj) => {
+      const line = obj as THREE.Line;
+      line.geometry.dispose();
+      (line.material as THREE.Material).dispose();
+    });
+    this.parentLinesGroup.clear();
 
     this.controls.setFrames(this.frames);
   }

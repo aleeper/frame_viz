@@ -14,6 +14,9 @@ export class MyControls {
   // The single control currently handling a drag (null when not dragging).
   private activeDragControl: CustomTransformControls | null = null;
 
+  // Maps each TransformControl → its frame index in Scene.frames (for drag identification).
+  private controlToFrameIndex = new Map<CustomTransformControls, number>();
+
   // Frame objects for hit-testing when gizmos are detached (Off mode).
   private frames: THREE.Object3D[] = [];
   private _frameRaycaster = new THREE.Raycaster();
@@ -27,6 +30,9 @@ export class MyControls {
 
   // Set by Scene to reflect the current interaction mode.
   public interactionActive = false;
+
+  // Class-level space so it persists across scene rebuilds (clearFrames/addFrame).
+  private _space: 'local' | 'world' = 'local';
 
   // Called when a click on a frame should activate interaction mode.
   public onActivate: (() => void) | null = null;
@@ -50,6 +56,32 @@ export class MyControls {
     this.domElement.addEventListener('pointermove', this._onPointerMove);
     this.domElement.addEventListener('pointerdown', this._onPointerDown);
     this.domElement.addEventListener('pointerup', this._onPointerUp);
+    // Class-level 's' handler — one listener, not one-per-control, so space
+    // toggles exactly once per keypress and survives scene rebuilds.
+    window.addEventListener('keydown', this._onSpaceKey);
+  }
+
+  // Toggle local/world space for all controls. A single handler ensures the
+  // toggle fires once per keypress regardless of how many frames are in the scene.
+  private _onSpaceKey = (event: KeyboardEvent) => {
+    if (event.key.toLowerCase() !== 's') return;
+    this._space = this._space === 'local' ? 'world' : 'local';
+    this.transformControls.forEach(c => c.setSpace(this._space));
+  };
+
+  public setSpace(space: 'local' | 'world') {
+    this._space = space;
+    this.transformControls.forEach(c => c.setSpace(space));
+  }
+
+  public registerFrameIndex(control: CustomTransformControls, index: number): void {
+    this.controlToFrameIndex.set(control, index);
+  }
+
+  // Returns the frame index currently being dragged, or -1 if no drag is active.
+  public getDraggedFrameIndex(): number {
+    if (!this.activeDragControl) return -1;
+    return this.controlToFrameIndex.get(this.activeDragControl) ?? -1;
   }
 
   public setFrames(frames: THREE.Object3D[]) {
@@ -225,18 +257,13 @@ export class MyControls {
     control.addEventListener('dragging-changed', (event) => {
       this.orbitControls.enabled = !event.value;
     });
-    let space_local = true;
-    control.setSpace('local');
+    // Inherit the current class-level space so new controls match existing ones
+    // after a scene rebuild (clearFrames/addFrame cycle).
+    control.setSpace(this._space);
     control.setSize(0.8);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      console.log("Controls.keydown");
-      control.removeEventListener('change', onChange);
       switch (event.key.toLowerCase()) {
-        case 's':
-          space_local = !space_local;
-          control.setSpace(space_local ? 'local' : 'world');
-          break;
         case '+':
           control.setSize(Math.min(control.size + 0.1, 2));
           break;
@@ -244,7 +271,6 @@ export class MyControls {
           control.setSize(Math.max(control.size - 0.1, 0.5));
           break;
       }
-      control.addEventListener('change', onChange);
     };
     window.addEventListener('keydown', handleKeyDown);
 
@@ -258,6 +284,7 @@ export class MyControls {
         window.removeEventListener('keydown', handleKeyDown);
         control.dispose();
         this.transformControls.delete(id);
+        this.controlToFrameIndex.delete(control);
       },
     };
   }
@@ -271,6 +298,7 @@ export class MyControls {
     this.domElement.removeEventListener('pointermove', this._onPointerMove);
     this.domElement.removeEventListener('pointerdown', this._onPointerDown);
     this.domElement.removeEventListener('pointerup', this._onPointerUp);
+    window.removeEventListener('keydown', this._onSpaceKey);
     this.orbitControls.dispose();
     this.transformControls.forEach((control) => control.dispose());
     this.transformControls.clear();

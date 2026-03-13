@@ -8,7 +8,7 @@ import { EulerAngleDisplay } from '../PoseDisplay/EulerAngleDisplay';
 import { poseToTransformationMatrix } from '../../utils/matrixUtils';
 import { buildDisplayList, getValidParents, PANEL_MAX_INDENT_DEPTH } from './frameTreeUtils';
 
-export type ReparentMode = 'preserve world' | 'preserve local';
+export type ReparentMode = 'preserve world' | 'preserve numbers';
 
 interface FrameListProps {
   poses: Poses;

@@ -10,11 +10,12 @@ interface PoseVisualizerProps {
   poses: Poses;
   upDirection: UpDirection;
   showWorldAxes?: boolean;
+  showParentLines?: boolean;
   onChange?: (newPoses: Poses) => void;
   onChangeCommit?: (newPoses: Poses) => void;
 }
 
-export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onChange, onChangeCommit }: PoseVisualizerProps) {
+export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showParentLines = true, onChange, onChangeCommit }: PoseVisualizerProps) {
   // console.log("PoseVisualize constructor!");
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene>();
@@ -40,9 +41,18 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
     const scene = sceneRef.current;
     const currentPoses = posesRef.current;
     const frameMap = posesToMap(currentPoses);
+    const draggedIndex = scene.getDraggedFrameIndex();
 
     const newPoses = scene.frames.map((frame, index) => {
       const pose = currentPoses[index];
+
+      // Non-dragged children: local position is unchanged — only their parent moved.
+      // Recomputing here would use stale parent world coords from posesRef (not yet
+      // re-rendered), corrupting the local offset on every intermediate pointermove.
+      if (pose.parent_id && index !== draggedIndex) {
+        return pose;
+      }
+
       const worldPos = { x: frame.position.x, y: frame.position.y, z: frame.position.z };
       const worldQuat = { x: frame.quaternion.x, y: frame.quaternion.y, z: frame.quaternion.z, w: frame.quaternion.w };
 
@@ -116,6 +126,12 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
       const frame = createFrame(worldPose, upDirection);
       scene.addFrame(frame, handleTransformChange);
     });
+    // Add semi-transparent lines from each parent to its children.
+    poses.forEach((pose, childIndex) => {
+      if (!pose.parent_id) return;
+      const parentIndex = poses.findIndex(p => p.id === pose.parent_id);
+      if (parentIndex !== -1) scene.addParentLine(childIndex, parentIndex);
+    });
     setPrevPoses(poses);
     // console.log("Setting interactionState: " + interactionState);
     scene.setInteractionState(interactionState);
@@ -123,9 +139,16 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
       if (!onChangeCommit) return;
       const currentPoses = posesRef.current;
       const frameMap = posesToMap(currentPoses);
+      // At commit time activeDragControl is still set (cleared after this callback).
+      const draggedIndex = scene.getDraggedFrameIndex();
 
       const newPoses = scene.frames.map((frame, index) => {
         const pose = currentPoses[index];
+
+        if (pose.parent_id && index !== draggedIndex) {
+          return pose;
+        }
+
         const worldPos = { x: frame.position.x, y: frame.position.y, z: frame.position.z };
         const worldQuat = { x: frame.quaternion.x, y: frame.quaternion.y, z: frame.quaternion.z, w: frame.quaternion.w };
 
@@ -192,6 +215,11 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, onCha
     if (!sceneRef.current) return;
     sceneRef.current.setWorldAxesVisible(showWorldAxes);
   }, [showWorldAxes]);
+
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setParentLinesVisible(showParentLines);
+  }, [showParentLines]);
 
 
   return (

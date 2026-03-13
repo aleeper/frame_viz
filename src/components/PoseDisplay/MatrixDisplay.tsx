@@ -13,20 +13,20 @@ export function MatrixDisplay({ matrix, label }: MatrixDisplayProps) {
       <div className="p-1">
         {label && <h3 className="text-lg font-semibold mb-2">{label}</h3>}
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse">
+          <table className="border-collapse text-xs">
             <tbody>
-              <tr>{columnLabels.map((value, j) => (<td>{columnLabels[j]}</td>))}</tr>
+              <tr>{columnLabels.map((value, j) => (<td key={j}>{columnLabels[j]}</td>))}</tr>
               {matrix.map((row, i) => (
                 <tr key={i}>
-                  <td className='px-1 text-left'>{rowLabels[i]}</td>
+                  <td className='pr-1 text-left text-xs'>{rowLabels[i]}</td>
                   {row.map((value, j) => (
                     <td
                       key={j}
-                      className={`px-2 py-1 text-right font-mono ${
+                      className={`px-1 py-0.5 text-right font-mono text-xs ${
                         j === 3 || j === 0 ? 'border-l border-gray-600' : ''
                       } ${i === 3 || i === 0 ? 'border-t border-gray-600' : ''}`}
                     >
-                      {value.toFixed(4)}
+                      {value.toFixed(3)}
                     </td>
                   ))}
                 </tr>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { JsonEditor } from './components/JsonEditor';
 import { DropdownControl } from './components/DropdownControl';
 import { FrameList, ReparentMode } from './components/FrameList';
@@ -10,34 +10,55 @@ import { useUndoRedo } from './hooks/useUndoRedo';
 import type { AppSnapshot } from './types/AppSnapshot';
 import { Representation, UpDirection } from './types/Representation';
 import { nanoid } from 'nanoid';
+import type { PinnedExpression } from './types/PinnedExpression';
+import { PinnedPanel } from './components/PinnedPanel';
 
 const defaultPoses: Poses = [
   {
-    id: 'pose1aaa',
-    name: "Pose1",
+    id: 'frame1xxx',
+    name: "Frame 1",
     position: { x: 0, y: 0, z: 0 },
-    quaternion: { x: 0, y: 0, z: 0, w: 1 }
+    quaternion: { x: 0, y: 0, z: 0, w: 1 },
   },
   {
-    id: 'pose2bbb',
-    name: "Pose 2",
+    id: 'frameAxxx',
+    name: "Frame A",
     position: { x: 2, y: 0, z: 0 },
-    quaternion: { x: 0, y: 0, z: -0.383, w: 0.924 }
+    quaternion: { x: 0, y: 0, z: -0.383, w: 0.924 },
+  },
+  {
+    id: 'frameBxxx',
+    name: "Frame B",
+    parent_id: 'frameAxxx',
+    position: { x: 1, y: 0, z: 0 },
+    quaternion: { x: 0, y: 0, z: 0, w: 1 },
   },
 ];
 
 function App() {
   const { snapshot, set, undo, redo, canUndo, canRedo } =
-    useUndoRedo<AppSnapshot>({ poses: defaultPoses });
+    useUndoRedo<AppSnapshot>({ poses: defaultPoses, pinnedExpressions: [] });
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
   const [dragPoses, setDragPoses] = useState<Poses | null>(null);
   const poses = dragPoses ?? snapshot.poses;
+  const pinnedExpressions = snapshot.pinnedExpressions ?? [];
   const handleDragChange = useCallback((p: Poses) => setDragPoses(p), []);
-  const handleDragCommit = useCallback((p: Poses) => { set({ poses: p }); setDragPoses(null); }, [set]);
-  const handleJsonChange = useCallback((p: Poses) => set({ poses: p }), [set]);
+  // Use snapshotRef so the callback stays stable across renders (no snapshot dep),
+  // preventing PoseVisualizer's scene effect from re-running (clearFrames) when
+  // unrelated snapshot fields change (e.g. a pin is added while a drag is live).
+  const handleDragCommit = useCallback((p: Poses) => { set({ ...snapshotRef.current, poses: p }); setDragPoses(null); }, [set]);
+  // Clear dragPoses on undo/redo: a sub-threshold drag (< deadband) can leave
+  // dragPoses non-null, causing `poses = dragPoses` to shadow snapshot.poses and
+  // making undo appear to do nothing.
+  const handleUndo = useCallback(() => { setDragPoses(null); undo(); }, [undo]);
+  const handleRedo = useCallback(() => { setDragPoses(null); redo(); }, [redo]);
+  const handleJsonChange = useCallback((p: Poses) => set({ ...snapshotRef.current, poses: p }), [set]);
   const [representation, setRepresentation] = useState<Representation>("Matrix");
   const [upDirection, setUpDirection] = useState<UpDirection>("Z");
   const [viewMode, setViewMode] = useState<'panels' | 'yaml'>('panels');
   const [showWorldAxes, setShowWorldAxes] = useState(true);
+  const [showParentLines, setShowParentLines] = useState(true);
   const [reparentMode, setReparentMode] = useState<ReparentMode>('preserve world');
   const [rightPanel, setRightPanel] = useState<'pinned' | null>(null);
 
@@ -55,58 +76,74 @@ function App() {
 
   const handleRemove = useCallback((id: string) => {
     set({
+      ...snapshot,
       poses: poses
         .filter(p => p.id !== id)
         .map(p => p.parent_id === id ? { ...p, parent_id: undefined } : p),
     });
-  }, [poses, set]);
+  }, [snapshot, poses, set]);
 
   // Destructuring removes the `name` key entirely when clearing, so the
   // serialized JSON never contains `name: undefined` as an explicit property.
   const handleRename = useCallback((id: string, name: string | undefined) =>
     set({
+      ...snapshot,
       poses: poses.map(pose => {
         if (pose.id !== id) return pose;
         const { name: _removed, ...rest } = pose;
         return name !== undefined ? { ...rest, name } : rest;
       }),
-    }), [poses, set]);
+    }), [snapshot, poses, set]);
 
   const handleSetParent = useCallback((id: string, newParentId: string | undefined) => {
     set({
+      ...snapshot,
       poses: poses.map(pose => {
         if (pose.id !== id) return pose;
 
         if (reparentMode === 'preserve world') {
-          const frameMap = posesToMap(poses);
-          const global_T_frame = composePath(id, frameMap);
+          try {
+            const frameMap = posesToMap(poses);
+            const global_T_frame = composePath(id, frameMap);
 
-          if (newParentId !== undefined) {
-            const global_T_new_parent = composePath(newParentId, frameMap);
-            const new_parent_T_frame = multiply(invert(global_T_new_parent), global_T_frame);
-            return {
-              ...pose,
-              parent_id: newParentId,
-              position: new_parent_T_frame.position,
-              quaternion: new_parent_T_frame.quaternion,
-            };
-          } else {
-            const { parent_id: _removed, ...rest } = pose;
-            return {
-              ...rest,
-              position: global_T_frame.position,
-              quaternion: global_T_frame.quaternion,
-            };
+            if (newParentId !== undefined) {
+              const global_T_new_parent = composePath(newParentId, frameMap);
+              const new_parent_T_frame = multiply(invert(global_T_new_parent), global_T_frame);
+              return {
+                ...pose,
+                parent_id: newParentId,
+                position: new_parent_T_frame.position,
+                quaternion: new_parent_T_frame.quaternion,
+              };
+            } else {
+              const { parent_id: _removed, ...rest } = pose;
+              return {
+                ...rest,
+                position: global_T_frame.position,
+                quaternion: global_T_frame.quaternion,
+              };
+            }
+          } catch {
+            // parent chain is broken (e.g. parent_id set to a name via YAML instead of an id) —
+            // fall through to preserve-numbers behaviour so the operation still completes
           }
         }
 
-        // preserve local
+        // preserve numbers (also fallback when preserve world chain is broken)
         return newParentId !== undefined
           ? { ...pose, parent_id: newParentId }
           : (() => { const { parent_id: _removed, ...rest } = pose; return rest; })();
       }),
     });
-  }, [poses, set, reparentMode]);
+  }, [snapshot, poses, set, reparentMode]);
+
+  const handleAddPin = useCallback((expr: PinnedExpression) =>
+    set({ ...snapshot, pinnedExpressions: [...pinnedExpressions, expr] }),
+    [snapshot, set, pinnedExpressions]);
+
+  const handleRemovePin = useCallback((id: string) =>
+    set({ ...snapshot, pinnedExpressions: pinnedExpressions.filter(e => e.id !== id) }),
+    [snapshot, set, pinnedExpressions]);
 
   useEffect(() => {
     if (import.meta.hot) {
@@ -119,13 +156,13 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
-      if      (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
-      else if (mod && e.shiftKey  && e.key.toLowerCase() === 'z') { e.preventDefault(); redo(); }
-      else if (mod && !e.shiftKey && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+      if      (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); handleUndo(); }
+      else if (mod && e.shiftKey  && e.key.toLowerCase() === 'z') { e.preventDefault(); handleRedo(); }
+      else if (mod && !e.shiftKey && e.key.toLowerCase() === 'y') { e.preventDefault(); handleRedo(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [handleUndo, handleRedo]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -136,7 +173,7 @@ function App() {
           <div className="flex-grow"></div>
           <div className="flex items-center gap-1">
             <button
-              onClick={undo}
+              onClick={handleUndo}
               disabled={!canUndo}
               aria-disabled={!canUndo}
               aria-label="Undo"
@@ -145,7 +182,7 @@ function App() {
               <Undo2 className="w-4 h-4" />
             </button>
             <button
-              onClick={redo}
+              onClick={handleRedo}
               disabled={!canRedo}
               aria-disabled={!canRedo}
               aria-label="Redo"
@@ -186,6 +223,15 @@ function App() {
                 />
                 <span className="text-gray-300 text-xs">World axes</span>
               </label>
+              <label className="flex items-center gap-2 px-2 py-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showParentLines}
+                  onChange={e => setShowParentLines(e.target.checked)}
+                  className="accent-blue-500"
+                />
+                <span className="text-gray-300 text-xs">Parent lines</span>
+              </label>
             </div>
           </div>
 
@@ -222,7 +268,7 @@ function App() {
                     onChange={e => setReparentMode(e.target.value as ReparentMode)}
                   >
                     <option value="preserve world">preserve world</option>
-                    <option value="preserve local">preserve local</option>
+                    <option value="preserve numbers">preserve numbers</option>
                   </select>
                 </div>
               </>
@@ -251,19 +297,20 @@ function App() {
         </div>
 
         {/* Middle Column */}
-        <div className="flex-1 min-w-0 bg-gray-800 rounded-lg shadow-lg space-y-2">
+        <div className="flex-1 min-w-0 overflow-hidden bg-gray-800 rounded-lg shadow-lg space-y-2">
           <PoseVisualizer
             poses={poses}
             onChange={handleDragChange}
             onChangeCommit={handleDragCommit}
             upDirection={upDirection}
             showWorldAxes={showWorldAxes}
+            showParentLines={showParentLines}
           />
         </div>
 
         {/* Right panel (Spec D content goes here) */}
         {rightPanel !== null && (
-          <div className="w-48 bg-gray-800 rounded-lg shadow-lg flex flex-col overflow-hidden shrink-0">
+          <div className="w-64 bg-gray-800 rounded-lg shadow-lg flex flex-col overflow-hidden shrink-0">
             <div className="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
               <span className="text-xs font-bold text-purple-400 uppercase tracking-wide">
                 {rightPanel === 'pinned' ? 'Pinned' : rightPanel}
@@ -275,9 +322,15 @@ function App() {
                 ✕
               </button>
             </div>
-            <div className="flex-1 p-2 text-xs text-gray-500 italic">
-              Coming in Spec D…
-            </div>
+            {rightPanel === 'pinned' && (
+              <PinnedPanel
+                poses={poses}
+                pinnedExpressions={pinnedExpressions}
+                representation={representation}
+                onAdd={handleAddPin}
+                onRemove={handleRemovePin}
+              />
+            )}
           </div>
         )}
 

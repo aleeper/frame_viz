@@ -23,6 +23,9 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
   posesRef.current = poses;
   const [prevPoses, setPrevPoses] = useState([]);
   const [interactionState, setInteractionState] = useState<InteractionState>("Off");
+  // Incremented each time the scene is recreated (e.g. upDirection change).
+  // Adding it to the frames effect deps ensures frames are rebuilt on the new scene.
+  const [sceneVersion, setSceneVersion] = useState(0);
   // const [upDirection, setUpDirection] = useState("Y");
 
   useEffect(() => {
@@ -94,6 +97,7 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
   useEffect(() => {
     if (!containerRef.current) return;
     setPrevPoses([]);
+    setSceneVersion(v => v + 1);
     const scene = new Scene(containerRef.current, upDirection);
     sceneRef.current = scene;
     scene.onInteractionStateChange = (state) => setInteractionState(state);
@@ -164,7 +168,7 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
 
       onChangeCommit(newPoses);
     };
-  }, [poses, handleTransformChange, onChangeCommit]);
+  }, [poses, handleTransformChange, onChangeCommit, sceneVersion]);
 
   useEffect(() => {
     let isKeyDown = false;

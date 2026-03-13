@@ -63,9 +63,7 @@ interface Pose {
 }
 ```
 
-**ID generation:** `nanoid(8)` on `handleAdd`. Short enough to be readable in YAML, collision-resistant for any realistic scene size.
-
-**Initialization:** The hardcoded `defaultPoses` in `App.tsx` must include generated IDs. Any code path that creates a `Pose` (including `defaultPoses`, `handleAdd`, and load-from-YAML) must ensure `id` is always present. The `isValidPose` validator accepts `id` as optional (for backward-compatible YAML), but all in-memory `Pose` objects must have an `id` at runtime.
+**ID generation:** `nanoid(8)` on `handleAdd` and in `defaultPoses`. Short enough to be readable in YAML, collision-resistant for any realistic scene size. Every code path that creates a `Pose` must supply an `id` — the validator requires it.
 
 **Multiple roots are allowed.** Any `Pose` with no `parent_id` lives directly in global space. There is no required root frame. This naturally supports multiple disjoint frame trees that may later be connected.
 
@@ -83,7 +81,7 @@ interface Pose {
   quaternion: {x: 0, y: 0, z: 0, w: 1}
 ```
 
-**Backward compatibility:** `id` and `parent_id` are optional in `isValidPose`. Existing YAML without these fields remains valid. On load, any frame missing `id` gets one auto-generated before being stored in state.
+`id` is required; `parent_id` and `name` are optional. YAML missing `id` is invalid and rejected by `isValidPose`.
 
 ### Transform Math Module
 
@@ -168,8 +166,8 @@ Four test files, pure functions only. No DOM, no Three.js mocking, no React.
 
 ### `src/types/Pose.test.ts`
 - Valid pose with all fields passes `isValidPose`
-- Valid pose with only required fields (no `id`, `name`, `parent_id`) passes
-- Missing `position` fails; missing `quaternion` fails
+- Valid pose with only required fields (`id`, `position`, `quaternion`) passes
+- Missing `id` fails; missing `position` fails; missing `quaternion` fails
 - Wrong types (e.g. `position` is a number) fail
 - Extra unknown fields pass (validator is permissive)
 
@@ -212,8 +210,7 @@ The left panel section is renamed "Frames" (was "Poses"). The `PoseDisplay` comp
 
 ### YAML / Validation
 
-- `isValidPose` updated to accept (not require) `id` and `parent_id`.
-- On load via `JsonEditor`: after parsing and validation, any frame missing `id` gets one auto-generated before being passed to `onChange`.
+- `isValidPose` requires `id`; rejects frames without it. `parent_id` and `name` remain optional.
 - `JsonEditor` round-trips `id` and `parent_id` transparently (they are preserved in the JSON text).
 
 ### Deleted Frame Edge Case

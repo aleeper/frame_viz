@@ -41,13 +41,13 @@ Transform notation throughout the codebase: `a_T_b` means "the transform that ex
 Function signatures must make frame semantics explicit:
 
 ```ts
-multiply(a_T_b: Pose, b_T_c: Pose): Pose   // returns a_T_c
-invert(a_T_b: Pose): Pose                   // returns b_T_a
-identity(): Pose                            // global_T_global (zero translation, unit quaternion)
-composePath(frameId: string, frames: Pose[]): Pose  // returns global_T_frame
+multiply(a_T_b: Pose, b_T_c: Pose): Pose       // returns a_T_c
+invert(a_T_b: Pose): Pose                       // returns b_T_a
+identity(): Pose                                // zero translation, unit quaternion
+composePath(frameId: string, frameMap: Map<string, Pose>): Pose  // returns global_T_frame
 ```
 
-This notation is also used in display labels: `world_T_shoulder`, `base_T_elbow`, etc. The UI renders these as `base_T_target` using frame names (falling back to IDs when name is absent).
+This notation is also used in display labels: `world_T_shoulder`, `base_T_elbow`, etc. The UI renders these using frame names, falling back to IDs when name is absent.
 
 ### Data Model Changes
 
@@ -65,6 +65,8 @@ interface Pose {
 
 **ID generation:** `nanoid(8)` on `handleAdd`. Short enough to be readable in YAML, collision-resistant for any realistic scene size.
 
+**Initialization:** The hardcoded `defaultPoses` in `App.tsx` must include generated IDs. Any code path that creates a `Pose` (including `defaultPoses`, `handleAdd`, and load-from-YAML) must ensure `id` is always present. The `isValidPose` validator accepts `id` as optional (for backward-compatible YAML), but all in-memory `Pose` objects must have an `id` at runtime.
+
 **Multiple roots are allowed.** Any `Pose` with no `parent_id` lives directly in global space. There is no required root frame. This naturally supports multiple disjoint frame trees that may later be connected.
 
 **YAML representation stays flat:**
@@ -81,24 +83,37 @@ interface Pose {
   quaternion: {x: 0, y: 0, z: 0, w: 1}
 ```
 
-**Backward compatibility:** `id` and `parent_id` are optional in the validator (`isValidPose`). Existing YAML without these fields remains valid; missing IDs are auto-generated on load.
+**Backward compatibility:** `id` and `parent_id` are optional in `isValidPose`. Existing YAML without these fields remains valid. On load, any frame missing `id` gets one auto-generated before being stored in state.
 
 ### Transform Math Module
 
-New file: `src/utils/transforms.ts`
-
-Houses all pure transform math. No Three.js imports. Fully unit-testable.
+New file: `src/utils/transforms.ts`. No Three.js imports. Fully unit-testable.
 
 ```ts
 export function identity(): Pose
-export function multiply(a_T_b: Pose, b_T_c: Pose): Pose   // quaternion multiplication + position transform
-export function invert(a_T_b: Pose): Pose                   // conjugate quaternion + transformed position
-export function composePath(frameId: string, frames: Pose[]): Pose
-  // Walks parent_id chain root→leaf, multiplies transforms.
-  // Throws descriptive error on missing parent_id or cycle detection.
+// Returns zero translation, unit quaternion.
+
+export function multiply(a_T_b: Pose, b_T_c: Pose): Pose
+// Returns a_T_c. Quaternion multiplication + position transform: a_pos + a_rot * b_pos.
+
+export function invert(a_T_b: Pose): Pose
+// Returns b_T_a. Conjugate quaternion + negated/rotated position.
+
+export function posesToMap(frames: Pose[]): Map<string, Pose>
+// Convenience: converts Pose[] to Map<id, Pose> for O(1) lookup.
+
+export function composePath(frameId: string, frameMap: Map<string, Pose>): Pose
+// Returns global_T_frame by walking the parent_id chain from the given frame up to the root,
+// then multiplying transforms root→leaf: global_T_root × root_T_parent × ... × parent_T_frame.
+//
+// Contract:
+// - A frame with no parent_id returns its own pose unchanged (it already lives in global space).
+// - A missing parent_id reference (dangling) throws: `Unknown parent_id "${id}" for frame "${frameId}"`.
+// - A cycle throws: `Cycle detected in parent chain at frame "${frameId}"`.
+//   Cycle detection uses a visited Set<string>; if frameId appears twice during chain traversal, throw.
 ```
 
-The existing `src/utils/matrixUtils.ts` (quaternion → rotation matrix) is imported by this module.
+The existing `src/utils/matrixUtils.ts` (quaternion → rotation matrix) is imported by this module where needed; it is not replaced or merged.
 
 ### Three.js Scene Architecture
 
@@ -106,7 +121,8 @@ The existing `src/utils/matrixUtils.ts` (quaternion → rotation matrix) is impo
 
 When rendering a frame, its world position is computed explicitly:
 ```ts
-const global_T_frame = composePath(frame.id, frames);
+const frameMap = posesToMap(frames);
+const global_T_frame = composePath(frame.id, frameMap);
 group.position.copy(global_T_frame.position);
 group.quaternion.copy(global_T_frame.quaternion);
 ```
@@ -126,20 +142,20 @@ Neither of these fits a tree. Keeping the scene flat and owning the math explici
 Four test files, pure functions only. No DOM, no Three.js mocking, no React.
 
 ### `src/utils/transforms.test.ts`
-- `identity()` returns zero translation, unit quaternion
-- `multiply(identity, p)` = `p`; `multiply(p, identity)` = `p`
-- `multiply` known chain: translate then rotate = expected result
-- `invert(a_T_b)` composed with `a_T_b` = identity
-- `composePath` single frame (no parent) = pose unchanged
-- `composePath` two-frame chain = `multiply(parent, child)`
-- `composePath` three-frame chain
-- `composePath` missing `parent_id` throws descriptive error
-- `composePath` cycle (A→B→A) throws
+- `identity()` returns zero translation `{x:0,y:0,z:0}` and unit quaternion `{x:0,y:0,z:0,w:1}`
+- `multiply(identity(), p)` equals `p`; `multiply(p, identity())` equals `p`
+- `multiply` known chain: pure translation then pure rotation = expected result (verify numerically)
+- `invert(a_T_b)` composed with `a_T_b` via `multiply` equals `identity()`
+- `composePath` single frame with no `parent_id` returns the frame's own pose unchanged (not `identity()`)
+- `composePath` two-frame chain equals `multiply(parent_pose, child_pose)`
+- `composePath` three-frame chain: verify result numerically with known inputs
+- `composePath` missing `parent_id` reference throws with message containing the missing ID
+- `composePath` cycle (A→B→A) throws with message containing the cycle frame ID
 
 ### `src/utils/matrixUtils.test.ts`
-- Identity quaternion → identity rotation matrix
-- 90° rotation around Z → expected matrix values
-- Round-trip stability: known quaternion → matrix → back
+- Identity quaternion → 3×3 identity rotation matrix (verify each element)
+- 90° rotation around Z axis → expected matrix values (numerically)
+- Known quaternion → matrix values match hand-computed reference (one-way correctness; no inverse function exists)
 
 ### `src/hooks/useUndoRedo.test.ts`
 - `set` pushes entry and increments index
@@ -148,13 +164,14 @@ Four test files, pure functions only. No DOM, no Three.js mocking, no React.
 - `undo` decrements index, returns previous snapshot
 - `redo` increments index
 - `canUndo` / `canRedo` correct at boundaries (index=0, index=length-1)
-- MAX_HISTORY cap: oldest entry dropped, index stable
+- MAX_HISTORY cap: oldest entry dropped, index stays at last entry
 
 ### `src/types/Pose.test.ts`
-- Valid pose (with and without optional fields) passes `isValidPose`
-- Missing required fields fail
-- Wrong types fail
-- Extra fields pass (validator is permissive)
+- Valid pose with all fields passes `isValidPose`
+- Valid pose with only required fields (no `id`, `name`, `parent_id`) passes
+- Missing `position` fails; missing `quaternion` fails
+- Wrong types (e.g. `position` is a number) fail
+- Extra unknown fields pass (validator is permissive)
 
 **Target:** ~40 tests total. All should run in < 1 second.
 
@@ -169,36 +186,48 @@ The left panel section is renamed "Frames" (was "Poses"). The `PoseDisplay` comp
 **Collapsed frame row:** chevron + name (or id fallback) + chain badge if depth > 2 (`↳ parent_name`)
 
 **Expanded frame panel:**
-- Parent picker: `<select>` dropdown listing all other frames by name (id fallback). Excludes self and own descendants (cycle prevention). Option "none" = no parent.
-- Pose numbers: always shown as parent-relative (position and orientation relative to `parent_id` frame, or global if no parent)
-- Existing representation toggle (quaternion / matrix / euler) applies
+- Parent picker: `<select>` dropdown listing all other frames by name (id fallback). Excludes self and own descendants (cycle prevention — use `composePath` traversal to identify descendants). Option "none" = no parent.
+- Pose numbers: always shown as `parent_T_frame` (parent-relative). If no parent, shown as `global_T_frame`.
+- Existing representation toggle (quaternion / matrix / euler) applies.
 
-**Indentation:** Capped at 2 visual levels. Depth 3+ frames show inline `↳ parent_name` badge instead of further indentation. Depth cap is a named constant for future configurability.
+**Indentation:** Capped at 2 visual levels. Depth 3+ frames show inline `↳ parent_name` badge instead of further indentation. Depth cap is a named constant `PANEL_MAX_INDENT_DEPTH = 2` for future configurability.
 
-**Re-parent mode toggle** (global, in panel header area):
-- `"preserve world"` — recalculates `pose` so `global_T_frame` is unchanged: `new_pose = invert(new_parent_global_T) × old_global_T`
-- `"preserve local"` — keeps `pose` numbers unchanged; frame moves in world space
+**Re-parent mode toggle** (global, lives in `App.tsx` as local `useState`, threaded down to `FrameList`):
+- `"preserve world"` — recalculates `parent_T_frame` so `global_T_frame` is unchanged:
+  ```
+  new_parent_T_frame = invert(global_T_new_parent) × global_T_frame
+  ```
+  where `global_T_new_parent = composePath(new_parent_id, frameMap)` and `global_T_frame = composePath(frame.id, frameMap)`.
+- `"preserve local"` — keeps the existing `parent_T_frame` pose numbers unchanged; the frame moves to a new world position.
 
 ### Three.js Integration
 
-- `Scene.ts` calls `composePath(frame.id, frames)` for each frame during rebuild to set world position
-- `handleTransformChange` (drag): reads dragged frame's current world transform from `group.position/quaternion`, converts to parent-relative: `parent_relative = invert(composePath(parent_id, frames)) × world_T_frame`
-- `onDragCommit` commits the parent-relative pose to history
+- During scene rebuild, build `frameMap = posesToMap(frames)` once, then call `composePath(frame.id, frameMap)` for each frame to set its world position/orientation on the `THREE.Group`.
+- `handleTransformChange` (drag): the dragged frame's world transform is read from `group.position` / `group.quaternion`. Convert to parent-relative using `posesRef.current` (the mid-drag state, not the committed snapshot):
+  ```
+  parent_T_frame = invert(composePath(frame.parent_id, posesToMap(posesRef.current))) × world_T_frame
+  ```
+  If the frame has no `parent_id`, the world transform is stored directly as the pose.
+- `onDragCommit` commits the parent-relative pose to history via `onChangeCommit`.
 
 ### YAML / Validation
 
-- `isValidPose` updated to accept (not require) `id` and `parent_id`
-- On load: frames missing `id` get one auto-generated
-- `JsonEditor` round-trips `id` and `parent_id` transparently
+- `isValidPose` updated to accept (not require) `id` and `parent_id`.
+- On load via `JsonEditor`: after parsing and validation, any frame missing `id` gets one auto-generated before being passed to `onChange`.
+- `JsonEditor` round-trips `id` and `parent_id` transparently (they are preserved in the JSON text).
+
+### Deleted Frame Edge Case
+
+When a frame is deleted, any frame whose `parent_id` references the deleted frame's `id` has its `parent_id` cleared (set to `undefined`). It becomes a root frame in global space. This is handled in the `handleRemove` callback before pushing to history.
 
 ### Right Sidebar Scaffold
 
-Spec C builds the sidebar shell (used by Spec D for content):
-- 32px activity bar on far right; icons select which panel to show
-- Clicking the active icon collapses the panel
-- Panel width ~200px
-- First icon slot reserved for pinned expressions (Spec D)
-- `AppSnapshot` does **not** yet gain sidebar state — that is Spec D
+Spec C builds the sidebar shell (populated with content in Spec D):
+- 32px activity bar on the far right; each icon selects a right panel.
+- Clicking the active icon collapses the panel to zero width; clicking an inactive icon opens it.
+- Panel width ~200px.
+- First icon slot reserved for pinned expressions (Spec D); rendered as a placeholder in Spec C.
+- `AppSnapshot` does **not** yet gain sidebar state — that is Spec D.
 
 ---
 
@@ -217,22 +246,27 @@ interface PinnedExpression {
 }
 ```
 
-`AppSnapshot` gains: `pinnedExpressions: PinnedExpression[]` — so the pinned list survives undo/redo.
+`AppSnapshot` gains `pinnedExpressions: PinnedExpression[]`. The field defaults to `[]` when absent (backward-compatible with existing history entries and YAML). It is typed as optional in `AppSnapshot` (`pinnedExpressions?: PinnedExpression[]`) and all read sites treat `undefined` as `[]`.
+
+### Deleted Frame Edge Case
+
+If a frame referenced by a `PinnedExpression` (`base_frame_id` or `target_frame_id`) is deleted, the pinned entry is displayed in an error state: label shown in muted color, value replaced with "⚠ frame not found." The entry is not auto-removed — the user must delete it manually. This avoids silent data loss.
 
 ### UI
 
-The right sidebar activity bar's first icon opens the **Pinned** panel.
+The right sidebar's first icon opens the **Pinned** panel.
 
 Each pinned entry displays:
-- Label: `base_T_target` (names, falling back to IDs)
-- Computed value: `invert(composePath(base_frame_id)) × composePath(target_frame_id)`
+- Label: `base_name_T_target_name` (using `name` fields, falling back to IDs)
+- Computed value: `invert(composePath(base_frame_id, frameMap)) × composePath(target_frame_id, frameMap)`
 - Values recompute live on every pose change
 - Representation follows the global representation toggle
 - × button removes the entry
+- Error state (see above) if either frame is missing
 
-"+ Pin expression" button opens two dropdowns: base frame, target frame. Any frame (including implicit global) is valid for either.
+"+ Pin expression" button opens two dropdowns: base frame, target frame. Any frame is valid for either role.
 
-### Out of scope for Spec D
+### Out of Scope for Spec D
 - Drag-and-drop reordering of pinned entries
 - Highlighting corresponding frames in the 3D view on hover
 - `kind: 'rotation'` and `kind: 'position'` (data model supports them; UI deferred)

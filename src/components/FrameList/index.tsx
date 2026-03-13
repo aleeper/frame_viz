@@ -131,7 +131,7 @@ export function FrameList({
                     <span className="font-mono">global_T_{pose.name ?? pose.id}</span>
                   )}
                 </div>
-                {renderPoseData(pose, representation)}
+                {renderPoseData(pose, representation, pose.name ?? pose.id, parentName ?? 'global')}
               </div>
             )}
           </div>
@@ -150,9 +150,9 @@ export function FrameList({
   );
 }
 
-function renderPoseData(pose: Pose, representation: Representation): ReactNode {
+function renderPoseData(pose: Pose, representation: Representation, childName?: string, parentName?: string): ReactNode {
   if (representation === 'Matrix') {
-    return <MatrixDisplay matrix={poseToTransformationMatrix(pose)} />;
+    return <MatrixDisplay matrix={poseToTransformationMatrix(pose)} childName={childName} parentName={parentName} />;
   } else if (representation === 'Quaternion') {
     return <PositionQuaternionDisplay pose={pose} />;
   } else if (representation.startsWith('Euler')) {

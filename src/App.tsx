@@ -65,7 +65,7 @@ function App() {
   const [showWorldAxes, setShowWorldAxes] = useState(true);
   const [showParentLines, setShowParentLines] = useState(true);
   const [reparentMode, setReparentMode] = useState<ReparentMode>('preserve world');
-  const [rightPanel, setRightPanel] = useState<'pinned' | null>(null);
+  const [rightPanel, setRightPanel] = useState<'pinned' | null>('pinned');
 
   const handleAdd = useCallback(() => {
     const usedNames = new Set(poses.map(p => p.name));

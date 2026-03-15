@@ -5,23 +5,106 @@ import { createFrame } from './utils';
 import { Pose, Poses } from '../../types/Pose';
 import { UpDirection } from '../../types/Representation';
 import { InteractionState } from './types/InteractionState';
-import { composePath, posesToMap, multiply, invert } from '../../utils/transforms';
+import { composePath, posesToMap, multiply, invert, identity } from '../../utils/transforms';
+import { isConnectedToObserver } from '../../utils/treeUtils';
 
 interface PoseVisualizerProps {
   poses: Poses;
   upDirection: UpDirection;
   showWorldAxes?: boolean;
   showParentLines?: boolean;
+  observerFrameId?: string;
   onChange?: (newPoses: Poses) => void;
   onChangeCommit?: (newPoses: Poses) => void;
 }
 
-export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showParentLines = true, onChange, onChangeCommit }: PoseVisualizerProps) {
-  // console.log("PoseVisualize constructor!");
+type FrameTransform = {
+  position: { x: number; y: number; z: number };
+  quaternion: { x: number; y: number; z: number; w: number };
+};
+
+/**
+ * Pure function: given the current Three.js frame positions and authoritative poses,
+ * returns updated poses reflecting the user's drag — or null if nothing changed.
+ *
+ * Handles two drag cases:
+ *   - Normal (non-ancestor) frame: update its own stored transform.
+ *   - Ancestor of observer: dragging it has no effect on its own global position
+ *     (the observer rides along). Instead, update its direct child toward the observer
+ *     so the ancestor *appears* at the dragged position from the observer's view.
+ *     Formula: new_parent_T_child = invert(obs_T_ancestor_dragged) * obs_T_child
+ */
+function computeDraggedPoses(
+  sceneFrames: FrameTransform[],
+  draggedIndex: number,
+  currentPoses: Poses,
+  obsId: string,
+  // Maps each ancestor ID → direct child ID toward the observer.
+  ancestorChildMap: Map<string, string>
+): Poses | null {
+  if (draggedIndex < 0 || draggedIndex >= sceneFrames.length) return null;
+
+  const frameMap = posesToMap(currentPoses);
+  const global_T_observer = obsId
+    ? (() => { try { return composePath(obsId, frameMap); } catch { return identity(); } })()
+    : identity();
+
+  const connectedPoses = currentPoses.filter(pose =>
+    !obsId || isConnectedToObserver(pose.id, obsId, currentPoses)
+  );
+
+  const draggedPose = connectedPoses[draggedIndex];
+  const tf = sceneFrames[draggedIndex];
+  if (!draggedPose || !tf) return null;
+
+  const obs_T_dragged: Pose = {
+    id: '',
+    position: { x: tf.position.x, y: tf.position.y, z: tf.position.z },
+    quaternion: { x: tf.quaternion.x, y: tf.quaternion.y, z: tf.quaternion.z, w: tf.quaternion.w },
+  };
+
+  const updatedById = new Map<string, Pose>();
+
+  if (ancestorChildMap.has(draggedPose.id)) {
+    // Ancestor drag: update the child-toward-observer's local transform so the
+    // ancestor appears at the dragged position. The ancestor's own data is unchanged.
+    const childId = ancestorChildMap.get(draggedPose.id)!;
+    const childPose = currentPoses.find(p => p.id === childId);
+    if (!childPose) return null;
+    const global_T_child = composePath(childId, frameMap);
+    const obs_T_child = multiply(invert(global_T_observer), global_T_child);
+    const new_parent_T_child = multiply(invert(obs_T_dragged), obs_T_child);
+    updatedById.set(childId, { ...childPose, position: new_parent_T_child.position, quaternion: new_parent_T_child.quaternion });
+  } else {
+    // Normal drag: update the frame's own stored transform.
+    const global_T_dragged = multiply(global_T_observer, obs_T_dragged);
+    if (draggedPose.parent_id) {
+      const global_T_parent = composePath(draggedPose.parent_id, frameMap);
+      const parent_T_dragged = multiply(invert(global_T_parent), global_T_dragged);
+      updatedById.set(draggedPose.id, { ...draggedPose, position: parent_T_dragged.position, quaternion: parent_T_dragged.quaternion });
+    } else {
+      updatedById.set(draggedPose.id, { ...draggedPose, position: global_T_dragged.position, quaternion: global_T_dragged.quaternion });
+    }
+  }
+
+  const newPoses = currentPoses.map(p => updatedById.get(p.id) ?? p);
+  if (JSON.stringify(newPoses) === JSON.stringify(currentPoses)) return null;
+  return newPoses;
+}
+
+export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showParentLines = true, observerFrameId, onChange, onChangeCommit }: PoseVisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene>();
   const posesRef = useRef<Poses>(poses);
   posesRef.current = poses;
+  const observerFrameIdRef = useRef<string>(observerFrameId ?? '');
+  observerFrameIdRef.current = observerFrameId ?? '';
+  // Tracks the observer ID from the last frames rebuild — NOT updated every render.
+  // Used to detect observer changes that need a scene rebuild even when poses are unchanged.
+  const prevObserverIdRef = useRef<string>(observerFrameId ?? '');
+  // Maps each ancestor frame ID → its direct child ID toward the observer.
+  // Updated in the frames effect alongside the scene rebuild.
+  const ancestorChildMapRef = useRef<Map<string, string>>(new Map());
   const [prevPoses, setPrevPoses] = useState([]);
   const [interactionState, setInteractionState] = useState<InteractionState>("Off");
   // Incremented each time the scene is recreated (e.g. after up-direction animation).
@@ -29,7 +112,11 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
   const [sceneKey, setSceneKey] = useState(0);
   // Saved camera state to restore position/orientation after scene recreation.
   const cameraStateRef = useRef<CameraState | null>(null);
-  // const [upDirection, setUpDirection] = useState("Y");
+  // Snapshot of poses captured at drag start. All drag computations use this
+  // fixed baseline so they are anchored to mousedown — matching how
+  // TransformControls itself uses _quaternionStart / _positionStart.
+  // Reset to null by onDragCommit so the next drag captures a fresh snapshot.
+  const dragStartPosesRef = useRef<Poses | null>(null);
 
   useEffect(() => {
     if (import.meta.hot) {
@@ -40,60 +127,58 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
   }, []);
 
   // Callback for pose updates from the Three.js window.
-  // Uses posesRef so it can be stable (not recreated each render).
+  // Uses posesRef/ancestorChildMapRef so it can be stable (not recreated each render).
   const handleTransformChange = useCallback(() => {
     if (!sceneRef.current || !onChange) return;
-
     const scene = sceneRef.current;
-    const currentPoses = posesRef.current;
-    const frameMap = posesToMap(currentPoses);
+
+    // change event fires on hover (axis highlight change), not just actual drags.
     const draggedIndex = scene.getDraggedFrameIndex();
+    if (draggedIndex === -1) return;
 
-    const newPoses = scene.frames.map((frame, index) => {
-      const pose = currentPoses[index];
+    // Capture a snapshot of poses at the start of each drag gesture.
+    // All computations during this drag use this fixed baseline, preventing
+    // any accumulated-state drift across multiple change events.
+    if (dragStartPosesRef.current === null) {
+      dragStartPosesRef.current = posesRef.current;
+    }
+    const basePoses = dragStartPosesRef.current;
 
-      // Non-dragged children: local position is unchanged — only their parent moved.
-      // Recomputing here would use stale parent world coords from posesRef (not yet
-      // re-rendered), corrupting the local offset on every intermediate pointermove.
-      if (pose.parent_id && index !== draggedIndex) {
-        return pose;
-      }
+    const newPoses = computeDraggedPoses(
+      scene.frames,
+      draggedIndex,
+      basePoses,
+      observerFrameIdRef.current,
+      ancestorChildMapRef.current
+    );
+    if (!newPoses) return;
 
-      const worldPos = { x: frame.position.x, y: frame.position.y, z: frame.position.z };
-      const worldQuat = { x: frame.quaternion.x, y: frame.quaternion.y, z: frame.quaternion.z, w: frame.quaternion.w };
+    // Live refresh: reposition all Three.js frames so children follow parents during drag.
+    const newFrameMap = posesToMap(newPoses);
+    const obsId = observerFrameIdRef.current;
+    const global_T_obs_new = obsId
+      ? (() => { try { return composePath(obsId, newFrameMap); } catch { return identity(); } })()
+      : identity();
 
-      if (pose.parent_id) {
-        // Convert world transform → parent-relative.
-        const global_T_parent = composePath(pose.parent_id, frameMap);
-        const world_T_frame = { ...pose, position: worldPos, quaternion: worldQuat };
-        const parent_T_frame = multiply(invert(global_T_parent), world_T_frame);
-        return { ...pose, position: parent_T_frame.position, quaternion: parent_T_frame.quaternion };
-      } else {
-        return { ...pose, position: worldPos, quaternion: worldQuat };
-      }
+    const newConnectedPoses = newPoses.filter(pose =>
+      !obsId || isConnectedToObserver(pose.id, obsId, newPoses)
+    );
+    scene.frames.forEach((threeFrame, index) => {
+      // Never overwrite the dragged frame's position/quaternion mid-drag.
+      // Three.js already placed it correctly, and overwriting it would move the
+      // drag plane (TransformControlsPlane repositions to worldPosition every frame),
+      // corrupting subsequent planeIntersect calculations in pointerMove.
+      if (index === draggedIndex) return;
+      const pose = newConnectedPoses[index];
+      if (!pose) return;
+      const global_T_f = composePath(pose.id, newFrameMap);
+      const obs_T_f = multiply(invert(global_T_obs_new), global_T_f);
+      threeFrame.position.set(obs_T_f.position.x, obs_T_f.position.y, obs_T_f.position.z);
+      threeFrame.quaternion.set(obs_T_f.quaternion.x, obs_T_f.quaternion.y, obs_T_f.quaternion.z, obs_T_f.quaternion.w);
     });
 
-    if (JSON.stringify(newPoses) !== JSON.stringify(currentPoses)) {
-      // Update world positions of all frames so children follow their parents live.
-      const newFrameMap = posesToMap(newPoses);
-      scene.frames.forEach((threeFrame, index) => {
-        const pose = newPoses[index];
-        const global_T_frame = composePath(pose.id, newFrameMap);
-        threeFrame.position.set(
-          global_T_frame.position.x,
-          global_T_frame.position.y,
-          global_T_frame.position.z,
-        );
-        threeFrame.quaternion.set(
-          global_T_frame.quaternion.x,
-          global_T_frame.quaternion.y,
-          global_T_frame.quaternion.z,
-          global_T_frame.quaternion.w,
-        );
-      });
-      setPrevPoses(newPoses);
-      onChange(newPoses);
-    }
+    setPrevPoses(newPoses);
+    onChange(newPoses);
   }, [onChange]);
 
   // Create (or recreate) the scene. Triggered on mount and after each
@@ -125,69 +210,84 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
   }, [sceneKey]);
 
   useEffect(() => {
-    // console.log("X");
     if (!sceneRef.current) return;
-    if (poses === prevPoses) return;
-    if (JSON.stringify(poses) === JSON.stringify(prevPoses)) return;
+    if (poses === prevPoses && observerFrameId === prevObserverIdRef.current) return;
+    if (JSON.stringify(poses) === JSON.stringify(prevPoses) && observerFrameId === prevObserverIdRef.current) return;
 
     const scene = sceneRef.current;
     scene.clearFrames();
     const frameMap = posesToMap(poses);
-    poses.forEach((pose) => {
-      // Compute world pose — scene is flat, all groups live at the scene root.
+    const obsId = observerFrameId ?? '';
+
+    // Compute observer's global pose once
+    const global_T_observer = obsId
+      ? (() => { try { return composePath(obsId, frameMap); } catch { return identity(); } })()
+      : identity();
+
+    const connectedPoses = poses.filter(pose =>
+      !obsId || isConnectedToObserver(pose.id, obsId, poses)
+    );
+
+    connectedPoses.forEach((pose) => {
       const global_T_frame = composePath(pose.id, frameMap);
-      const worldPose = { ...pose, position: global_T_frame.position, quaternion: global_T_frame.quaternion };
+      const observer_T_frame = multiply(invert(global_T_observer), global_T_frame);
+      const worldPose = { ...pose, position: observer_T_frame.position, quaternion: observer_T_frame.quaternion };
+      const isObserver = pose.id === obsId;
       const frame = createFrame(worldPose, upDirection);
-      scene.addFrame(frame, handleTransformChange);
+      // Observer has no gizmo (noGizmoIndices below), so () => {} is just explicit safety.
+      scene.addFrame(frame, isObserver ? () => {} : handleTransformChange);
     });
+
+    // Build ancestor→child map: walking parent_id upward from observer, at each step
+    // the previous node is the "child toward observer" for the current ancestor.
+    // Also note which connectedPoses index is the observer for gizmo suppression.
+    const ancestorChildMap = new Map<string, string>();
+    let walkId: string | undefined = obsId || undefined;
+    let childWalkId: string | undefined = undefined;
+    while (walkId) {
+      if (childWalkId !== undefined) ancestorChildMap.set(walkId, childWalkId);
+      childWalkId = walkId;
+      walkId = poses.find(p => p.id === walkId)?.parent_id;
+    }
+    ancestorChildMapRef.current = ancestorChildMap;
+
+    // Only suppress the observer's own gizmo — ancestors get gizmos and use the
+    // ancestor-drag formula in computeDraggedPoses to update the child toward observer.
+    const obsIdx = connectedPoses.findIndex(p => p.id === obsId);
+    scene.setNoGizmoIndices(obsIdx !== -1 ? new Set([obsIdx]) : new Set());
+
     // Add semi-transparent lines from each parent to its children.
-    poses.forEach((pose, childIndex) => {
+    connectedPoses.forEach((pose, childIndex) => {
       if (!pose.parent_id) return;
-      const parentIndex = poses.findIndex(p => p.id === pose.parent_id);
+      const parentIndex = connectedPoses.findIndex(p => p.id === pose.parent_id);
       if (parentIndex !== -1) scene.addParentLine(childIndex, parentIndex);
     });
     setPrevPoses(poses);
-    // console.log("Setting interactionState: " + interactionState);
+    prevObserverIdRef.current = observerFrameId ?? '';
     scene.setInteractionState(interactionState);
     scene.onDragCommit = () => {
+      // Use the drag-start snapshot for the commit computation, then clear it
+      // so the next drag gesture captures a fresh snapshot.
+      const commitBase = dragStartPosesRef.current ?? posesRef.current;
+      dragStartPosesRef.current = null;
       if (!onChangeCommit) return;
-      const currentPoses = posesRef.current;
-      const frameMap = posesToMap(currentPoses);
-      // At commit time activeDragControl is still set (cleared after this callback).
-      const draggedIndex = scene.getDraggedFrameIndex();
-
-      const newPoses = scene.frames.map((frame, index) => {
-        const pose = currentPoses[index];
-
-        if (pose.parent_id && index !== draggedIndex) {
-          return pose;
-        }
-
-        const worldPos = { x: frame.position.x, y: frame.position.y, z: frame.position.z };
-        const worldQuat = { x: frame.quaternion.x, y: frame.quaternion.y, z: frame.quaternion.z, w: frame.quaternion.w };
-
-        if (pose.parent_id) {
-          const global_T_parent = composePath(pose.parent_id, frameMap);
-          const world_T_frame = { ...pose, position: worldPos, quaternion: worldQuat };
-          const parent_T_frame = multiply(invert(global_T_parent), world_T_frame);
-          return { ...pose, position: parent_T_frame.position, quaternion: parent_T_frame.quaternion };
-        } else {
-          return { ...pose, position: worldPos, quaternion: worldQuat };
-        }
-      });
-
-      onChangeCommit(newPoses);
+      const newPoses = computeDraggedPoses(
+        scene.frames,
+        scene.getDraggedFrameIndex(),
+        commitBase,
+        observerFrameIdRef.current,
+        ancestorChildMapRef.current
+      );
+      if (newPoses) onChangeCommit(newPoses);
     };
-  }, [poses, handleTransformChange, onChangeCommit, sceneKey]);
+  }, [poses, handleTransformChange, onChangeCommit, sceneKey, observerFrameId]);
 
   useEffect(() => {
     let isKeyDown = false;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isKeyDown) return;
-      // console.log("PoseVisualizer.keydown");
       if (!sceneRef.current) return;
       const scene = sceneRef.current;
-      console.log("Event: " + event.key);
       setInteractionState((prevState) => {
         let newInteractionState: InteractionState = prevState;
         switch (event.key.toLowerCase()) {
@@ -201,22 +301,20 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
             newInteractionState = "Rotate";
             break;
         }
-        // console.log("interactionState: " + prevState + ", newInteractionState: " + newInteractionState);
         if (newInteractionState !== prevState) {
           scene.setInteractionState(newInteractionState);
         }
         return newInteractionState;
       });
     };
-    const handleKeyUp = (event: KeyboardEvent) => {
+    const handleKeyUp = (_event: KeyboardEvent) => {
       isKeyDown = false;
     };
-    console.log("Adding keydown listener.");
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
 
@@ -235,7 +333,6 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
     sceneRef.current.setParentLinesVisible(showParentLines);
   }, [showParentLines]);
 
-
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
@@ -243,9 +340,6 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
         <p className="text-sm text-white">
           Q: Controls Off | W: Translate | E: Rotate | S: local vs global
         </p>
-        {/* <p className="text-sm text-white">
-          +/-: Adjust Control Size | Click and drag to orbit | Scroll to zoom
-        </p> */}
       </div>
     </div>
   );

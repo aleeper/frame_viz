@@ -55,6 +55,7 @@ export class Scene {
   private lastActiveMode: 'Translate' | 'Rotate' = 'Translate';
   private parentLinesGroup = new THREE.Group();
   private upAnimState: UpAnimState | null = null;
+  private noGizmoIndices: Set<number> = new Set();
 
   // Called when click interactions change the interaction mode.
   public onInteractionStateChange: ((state: InteractionState) => void) | null = null;
@@ -376,6 +377,10 @@ export class Scene {
     return this.controls.getDraggedFrameIndex();
   }
 
+  public setNoGizmoIndices(indices: Set<number>): void {
+    this.noGizmoIndices = indices;
+  }
+
   public setInteractionState(interactionState: InteractionState) {
     if (interactionState !== 'Off') {
       this.lastActiveMode = interactionState;
@@ -384,6 +389,7 @@ export class Scene {
 
     this.control_list.forEach((control, index) => {
       control.detach();
+      if (this.noGizmoIndices.has(index)) return;
       switch(interactionState) {
         case "Off":
           break;
@@ -418,6 +424,7 @@ export class Scene {
       (line.material as THREE.Material).dispose();
     });
     this.parentLinesGroup.clear();
+    this.noGizmoIndices = new Set();
     this.controls.setFrames(this.frames);
   }
 

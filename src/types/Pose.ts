@@ -1,7 +1,7 @@
 export interface Pose {
   id: string;           // stable, auto-generated (nanoid 8 chars). Never changes after creation.
   name?: string;        // display only, user-editable
-  parent_id?: string;   // references another Pose's id. Absent = root in global space.
+  parent_id?: string;   // references another Pose's id. Absent = tree root (no implicit global frame).
   position: {
     x: number;
     y: number;

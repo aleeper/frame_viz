@@ -7,6 +7,7 @@ import { PositionQuaternionDisplay } from '../PoseDisplay/PositionQuaternionDisp
 import { EulerAngleDisplay } from '../PoseDisplay/EulerAngleDisplay';
 import { poseToTransformationMatrix } from '../../utils/matrixUtils';
 import { buildDisplayList, getValidParents, PANEL_MAX_INDENT_DEPTH } from './frameTreeUtils';
+import { isConnectedToObserver } from '../../utils/treeUtils';
 
 export type ReparentMode = 'preserve world' | 'preserve numbers';
 
@@ -22,6 +23,7 @@ interface FrameListProps {
   poses: Poses;
   representation: Representation;
   reparentMode: ReparentMode;
+  observerFrameId?: string;
   onAdd?: () => void;
   onRemove?: (id: string) => void;
   onRename?: (id: string, name: string | undefined) => void;
@@ -32,6 +34,7 @@ export function FrameList({
   poses,
   representation,
   reparentMode,
+  observerFrameId,
   onAdd,
   onRemove,
   onRename,
@@ -39,6 +42,14 @@ export function FrameList({
 }: FrameListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const displayList = buildDisplayList(poses);
+
+  const disconnectedIds = new Set(
+    observerFrameId
+      ? poses
+          .filter(p => !isConnectedToObserver(p.id, observerFrameId, poses))
+          .map(p => p.id)
+      : []
+  );
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -71,6 +82,14 @@ export function FrameList({
             >
               <span className="text-gray-400 text-xs w-3">{isExpanded ? '▼' : '▶'}</span>
               <span className="flex-1 font-medium text-gray-100 truncate">{displayName}</span>
+              {disconnectedIds.has(pose.id) && (
+                <span
+                  className="text-yellow-400 text-xs shrink-0 cursor-help"
+                  title={`Not connected to observer frame — not rendered in 3D view`}
+                >
+                  ⚠
+                </span>
+              )}
               {showBadge && parentName && (
                 <span className="text-xs bg-gray-600 text-blue-300 px-1.5 py-0.5 rounded shrink-0">
                   ↳ {parentName}
@@ -112,7 +131,7 @@ export function FrameList({
                       value={pose.parent_id ?? ''}
                       onChange={e => onSetParent(pose.id, e.target.value || undefined)}
                     >
-                      <option value="">none (global)</option>
+                      <option value="">(none)</option>
                       {getValidParents(pose.id, poses).map(p => (
                         <option key={p.id} value={p.id}>
                           {p.name ?? p.id}
@@ -136,10 +155,10 @@ export function FrameList({
                       {toFrameLabel(poses.find(p => p.id === pose.parent_id)?.name ?? pose.parent_id)}_T_{toFrameLabel(pose.name ?? pose.id)}
                     </span>
                   ) : (
-                    <span className="font-mono">global_T_{toFrameLabel(pose.name ?? pose.id)}</span>
+                    <span className="font-mono text-gray-400">(root)_T_{toFrameLabel(pose.name ?? pose.id)}</span>
                   )}
                 </div>
-                {renderPoseData(pose, representation, pose.name ?? pose.id, parentName ?? 'global')}
+                {renderPoseData(pose, representation, pose.name ?? pose.id, parentName ?? 'root')}
               </div>
             )}
           </div>

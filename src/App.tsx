@@ -13,16 +13,26 @@ import { nanoid } from 'nanoid';
 import type { PinnedExpression } from './types/PinnedExpression';
 import { PinnedPanel } from './components/PinnedPanel';
 
+const WORLD_ID = 'worldxxx';
+
 const defaultPoses: Poses = [
+  {
+    id: WORLD_ID,
+    name: 'World',
+    position: { x: 0, y: 0, z: 0 },
+    quaternion: { x: 0, y: 0, z: 0, w: 1 },
+  },
   {
     id: 'frame1xxx',
     name: "Frame 1",
-    position: { x: 0, y: 0, z: 0 },
+    parent_id: WORLD_ID,
+    position: { x: 0, y: 3, z: 1 },
     quaternion: { x: 0, y: 0, z: 0, w: 1 },
   },
   {
     id: 'frameAxxx',
     name: "Frame A",
+    parent_id: WORLD_ID,
     position: { x: 2, y: 0, z: 0 },
     quaternion: { x: 0, y: 0, z: -0.383, w: 0.924 },
   },
@@ -30,8 +40,17 @@ const defaultPoses: Poses = [
     id: 'frameBxxx',
     name: "Frame B",
     parent_id: 'frameAxxx',
-    position: { x: 1, y: 0, z: 0 },
+    position: { x: 1.5, y: 0, z: 0 },
     quaternion: { x: 0, y: 0, z: 0, w: 1 },
+  },
+];
+
+const defaultPinnedExpressions: PinnedExpression[] = [
+  {
+    id: 'pin1xxxx',
+    base_frame_id: 'frame1xxx',
+    target_frame_id: 'frameBxxx',
+    kind: 'transform',
   },
 ];
 
@@ -39,14 +58,18 @@ function App() {
   const { snapshot, set, undo, redo, canUndo, canRedo } =
     useUndoRedo<AppSnapshot>({
       poses: defaultPoses,
-      pinnedExpressions: [
-        { id: 'pin1xxxx', base_frame_id: 'frame1xxx', target_frame_id: 'frameBxxx', kind: 'transform' },
-      ],
+      pinnedExpressions: defaultPinnedExpressions,
+      view: { observer_frame_id: WORLD_ID },
     });
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
   const [dragPoses, setDragPoses] = useState<Poses | null>(null);
   const poses = dragPoses ?? snapshot.poses;
+  const effectiveObserverFrameId = (() => {
+    const id = snapshot.view?.observer_frame_id;
+    if (id && poses.some(p => p.id === id)) return id;
+    return poses[0]?.id ?? '';
+  })();
   const pinnedExpressions = snapshot.pinnedExpressions ?? [];
   const handleDragChange = useCallback((p: Poses) => setDragPoses(p), []);
   // Use snapshotRef so the callback stays stable across renders (no snapshot dep),
@@ -74,19 +97,33 @@ function App() {
     set({ ...snapshot, poses: [...poses, {
       id: nanoid(8),
       name: `Frame ${i}`,
+      parent_id: effectiveObserverFrameId || undefined,
       position: { x: 0, y: 0, z: 0 },
       quaternion: { x: 0, y: 0, z: 0, w: 1 },
     }] });
-  }, [snapshot, poses, set]);
+  }, [snapshot, poses, set, effectiveObserverFrameId]);
+
+  const handleSetObserver = useCallback((id: string) => {
+    set({ ...snapshotRef.current, view: { observer_frame_id: id } });
+  }, [set]);
 
   const handleRemove = useCallback((id: string) => {
+    const newPoses = poses
+      .filter(p => p.id !== id)
+      .map(p => p.parent_id === id ? { ...p, parent_id: undefined } : p);
+
+    const currentObserverId = snapshotRef.current.view?.observer_frame_id;
+    const newObserverId =
+      currentObserverId === id
+        ? (newPoses[0]?.id ?? '')
+        : (currentObserverId ?? newPoses[0]?.id ?? '');
+
     set({
-      ...snapshot,
-      poses: poses
-        .filter(p => p.id !== id)
-        .map(p => p.parent_id === id ? { ...p, parent_id: undefined } : p),
+      ...snapshotRef.current,
+      poses: newPoses,
+      view: { observer_frame_id: newObserverId },
     });
-  }, [snapshot, poses, set]);
+  }, [poses, set]);
 
   // Destructuring removes the `name` key entirely when clearing, so the
   // serialized JSON never contains `name: undefined` as an explicit property.
@@ -219,6 +256,20 @@ function App() {
                   options={["X", "Y", "Z"].map((item) => ({ label: item, value: item }))}
                 />
               </div>
+              <div className="flex items-center gap-2 px-2 py-1.5">
+                <p className="text-gray-300 text-xs shrink-0">Observer</p>
+                <select
+                  className="flex-1 text-xs border border-gray-600 rounded bg-gray-700 text-white px-1 py-0.5"
+                  value={effectiveObserverFrameId}
+                  onChange={e => handleSetObserver(e.target.value)}
+                >
+                  {poses.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name ?? p.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <label className="flex items-center gap-2 px-2 py-1.5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -291,6 +342,7 @@ function App() {
                 poses={poses}
                 representation={representation}
                 reparentMode={reparentMode}
+                observerFrameId={effectiveObserverFrameId}
                 onAdd={handleAdd}
                 onRemove={handleRemove}
                 onRename={handleRename}
@@ -310,6 +362,7 @@ function App() {
             upDirection={upDirection}
             showWorldAxes={showWorldAxes}
             showParentLines={showParentLines}
+            observerFrameId={effectiveObserverFrameId}
           />
         </div>
 

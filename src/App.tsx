@@ -5,13 +5,15 @@ import { FrameList, ReparentMode } from './components/FrameList';
 import { composePath, posesToMap, multiply, invert } from './utils/transforms';
 import { PoseVisualizer } from './components/PoseVisualizer';
 import { Poses } from './types/Pose';
-import { LayoutGrid, Undo2, Redo2 } from 'lucide-react';
+import { LayoutGrid, Undo2, Redo2, FolderOpen, Settings } from 'lucide-react';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import type { AppSnapshot } from './types/AppSnapshot';
 import { Representation, UpDirection } from './types/Representation';
 import { nanoid } from 'nanoid';
 import type { PinnedExpression } from './types/PinnedExpression';
 import { PinnedPanel } from './components/PinnedPanel';
+import { ScenePanel } from './components/ScenePanel';
+import { OptionsPanel } from './components/OptionsPanel';
 
 const WORLD_ID = 'worldxxx';
 
@@ -89,7 +91,7 @@ function App() {
   const [showWorldAxes, setShowWorldAxes] = useState(true);
   const [showParentLines, setShowParentLines] = useState(true);
   const [reparentMode, setReparentMode] = useState<ReparentMode>('preserve world');
-  const [rightPanel, setRightPanel] = useState<'pinned' | null>('pinned');
+  const [rightPanel, setRightPanel] = useState<'pinned' | 'scene' | 'options' | null>('pinned');
 
   const handleAdd = useCallback(() => {
     const usedNames = new Set(poses.map(p => p.name));
@@ -180,6 +182,11 @@ function App() {
     });
   }, [snapshot, poses, set, reparentMode]);
 
+  const handleLoadScene = useCallback((newSnapshot: AppSnapshot) => {
+    set(newSnapshot);
+    setDragPoses(null);
+  }, [set]);
+
   const handleAddPin = useCallback((expr: PinnedExpression) =>
     set({ ...snapshot, pinnedExpressions: [...pinnedExpressions, expr] }),
     [snapshot, set, pinnedExpressions]);
@@ -242,56 +249,6 @@ function App() {
       <main className="p-4 flex gap-4 h-[calc(100vh-5rem)]">
         {/* Left column */}
         <div className="flex flex-col w-80 bg-gray-800 rounded-lg shadow-lg overflow-hidden shrink-0">
-          {/* Scene Options */}
-          <div className="shrink-0 px-2 pt-2 pb-1">
-            <div className="bg-gray-700 rounded-lg overflow-hidden">
-              <div className="px-2 py-1 border-b border-gray-600">
-                <span className="text-gray-300 text-xs font-semibold uppercase tracking-wide">Scene Options</span>
-              </div>
-              <div className="flex items-center gap-2 px-2 py-1.5">
-                <p className="text-gray-300 text-xs shrink-0">Up Direction</p>
-                <DropdownControl
-                  id="up-direction"
-                  value={upDirection}
-                  onChange={setUpDirection}
-                  options={["X", "Y", "Z"].map((item) => ({ label: item, value: item }))}
-                />
-              </div>
-              <div className="flex items-center gap-2 px-2 py-1.5">
-                <p className="text-gray-300 text-xs shrink-0">Observer</p>
-                <select
-                  className="flex-1 text-xs border border-gray-600 rounded bg-gray-700 text-white px-1 py-0.5"
-                  value={effectiveObserverFrameId}
-                  onChange={e => handleSetObserver(e.target.value)}
-                >
-                  {poses.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name ?? p.id}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <label className="flex items-center gap-2 px-2 py-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showWorldAxes}
-                  onChange={e => setShowWorldAxes(e.target.checked)}
-                  className="accent-blue-500"
-                />
-                <span className="text-gray-300 text-xs">World axes</span>
-              </label>
-              <label className="flex items-center gap-2 px-2 py-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showParentLines}
-                  onChange={e => setShowParentLines(e.target.checked)}
-                  className="accent-blue-500"
-                />
-                <span className="text-gray-300 text-xs">Parent lines</span>
-              </label>
-            </div>
-          </div>
-
           {/* Toggle + settings bar */}
           <div className="flex flex-col gap-1 px-2 pb-1 shrink-0">
             <div className="flex bg-gray-700 rounded p-0.5">
@@ -355,7 +312,7 @@ function App() {
         </div>
 
         {/* Middle Column */}
-        <div className="flex-1 min-w-0 overflow-hidden bg-gray-800 rounded-lg shadow-lg space-y-2">
+        <div className="flex-1 min-w-0 overflow-hidden bg-gray-800 rounded-lg shadow-lg relative">
           <PoseVisualizer
             poses={poses}
             onChange={handleDragChange}
@@ -365,14 +322,27 @@ function App() {
             showParentLines={showParentLines}
             observerFrameId={effectiveObserverFrameId}
           />
+          {/* Observer overlay — top-left of 3D viewport */}
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-gray-900 bg-opacity-75 rounded-lg px-2 py-1">
+            <span className="text-xs text-gray-400 shrink-0">Observer</span>
+            <select
+              className="text-xs bg-transparent text-white border-none outline-none cursor-pointer"
+              value={effectiveObserverFrameId}
+              onChange={e => handleSetObserver(e.target.value)}
+            >
+              {poses.map(p => (
+                <option key={p.id} value={p.id} className="bg-gray-900">{p.name ?? p.id}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Right panel (Spec D content goes here) */}
+        {/* Right panel */}
         {rightPanel !== null && (
-          <div className="w-64 bg-gray-800 rounded-lg shadow-lg flex flex-col overflow-hidden shrink-0">
+          <div className="w-56 bg-gray-800 rounded-lg shadow-lg flex flex-col overflow-hidden shrink-0">
             <div className="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
               <span className="text-xs font-bold text-purple-400 uppercase tracking-wide">
-                {rightPanel === 'pinned' ? 'Pinned' : rightPanel}
+                {rightPanel === 'pinned' ? 'Pinned' : rightPanel === 'scene' ? 'Scene' : 'Options'}
               </span>
               <button
                 className="text-gray-500 hover:text-white text-xs"
@@ -381,15 +351,33 @@ function App() {
                 ✕
               </button>
             </div>
-            {rightPanel === 'pinned' && (
-              <PinnedPanel
-                poses={poses}
-                pinnedExpressions={pinnedExpressions}
-                representation={representation}
-                onAdd={handleAddPin}
-                onRemove={handleRemovePin}
-              />
-            )}
+            <div className="flex-1 overflow-y-auto">
+              {rightPanel === 'pinned' && (
+                <PinnedPanel
+                  poses={poses}
+                  pinnedExpressions={pinnedExpressions}
+                  representation={representation}
+                  onAdd={handleAddPin}
+                  onRemove={handleRemovePin}
+                />
+              )}
+              {rightPanel === 'scene' && (
+                <ScenePanel
+                  snapshot={snapshot}
+                  onLoad={handleLoadScene}
+                />
+              )}
+              {rightPanel === 'options' && (
+                <OptionsPanel
+                  upDirection={upDirection}
+                  onUpDirectionChange={setUpDirection}
+                  showWorldAxes={showWorldAxes}
+                  onShowWorldAxesChange={setShowWorldAxes}
+                  showParentLines={showParentLines}
+                  onShowParentLinesChange={setShowParentLines}
+                />
+              )}
+            </div>
           </div>
         )}
 
@@ -397,13 +385,27 @@ function App() {
         <div className="w-8 bg-gray-800 border border-gray-700 rounded-lg shadow-lg flex flex-col items-center py-2 gap-1 shrink-0">
           <button
             title="Pinned expressions"
-            className={`w-6 h-6 flex items-center justify-center rounded text-sm transition-colors
-              ${rightPanel === 'pinned'
-                ? 'bg-gray-700 text-blue-400'
-                : 'text-gray-500 hover:text-gray-200'}`}
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors
+              ${rightPanel === 'pinned' ? 'bg-gray-700 text-blue-400' : 'text-gray-500 hover:text-gray-200'}`}
             onClick={() => setRightPanel(p => p === 'pinned' ? null : 'pinned')}
           >
             ⇄
+          </button>
+          <button
+            title="Load / save scene"
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors
+              ${rightPanel === 'scene' ? 'bg-gray-700 text-blue-400' : 'text-gray-500 hover:text-gray-200'}`}
+            onClick={() => setRightPanel(p => p === 'scene' ? null : 'scene')}
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+          </button>
+          <button
+            title="Scene options"
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors
+              ${rightPanel === 'options' ? 'bg-gray-700 text-blue-400' : 'text-gray-500 hover:text-gray-200'}`}
+            onClick={() => setRightPanel(p => p === 'options' ? null : 'options')}
+          >
+            <Settings className="w-3.5 h-3.5" />
           </button>
         </div>
       </main>

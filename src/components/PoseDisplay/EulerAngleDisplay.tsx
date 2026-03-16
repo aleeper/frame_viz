@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import React from 'react';
 import { Pose } from '../types/Pose';
 import { Representation } from '../../types/Representation';
 

@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface DropdownControlProps<T> {
   value: T;
   onChange: (value: T) => void;

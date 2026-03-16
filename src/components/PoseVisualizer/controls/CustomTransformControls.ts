@@ -78,7 +78,6 @@ class TransformControls extends Controls {
 						gizmo[ propName ] = value;
 
 						scope.dispatchEvent( { type: propName + '-changed', value: value } );
-						// console.log("dispatch1");
 						scope.dispatchEvent( _changeEvent );
 
 					}
@@ -521,7 +520,6 @@ class TransformControls extends Controls {
 			}
 
 		}
-		// console.log("dispatch2");
 		this.dispatchEvent( _changeEvent );
 		this.dispatchEvent( _objectChangeEvent );
 
@@ -582,7 +580,6 @@ class TransformControls extends Controls {
 			this.object.position.copy( this._positionStart );
 			this.object.quaternion.copy( this._quaternionStart );
 			this.object.scale.copy( this._scaleStart );
-			// console.log("dispatch3");
 			this.dispatchEvent( _changeEvent );
 			this.dispatchEvent( _objectChangeEvent );
 

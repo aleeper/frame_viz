@@ -1,4 +1,3 @@
-import React from 'react';
 import { Matrix } from '../types/pose';
 
 interface MatrixDisplayProps {

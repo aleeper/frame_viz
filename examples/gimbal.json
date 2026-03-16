@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "poses": [
+    {
+      "id": "gm_world",
+      "name": "World",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "quaternion": { "x": 0, "y": 0, "z": 0, "w": 1 }
+    },
+    {
+      "id": "gm_outer",
+      "name": "Outer",
+      "parent_id": "gm_world",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "quaternion": { "x": 0, "y": 0, "z": 0.7071, "w": 0.7071 }
+    },
+    {
+      "id": "gm_middl",
+      "name": "Middle",
+      "parent_id": "gm_outer",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "quaternion": { "x": 0.3827, "y": 0, "z": 0, "w": 0.9239 }
+    },
+    {
+      "id": "gm_inner",
+      "name": "Inner",
+      "parent_id": "gm_middl",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "quaternion": { "x": 0, "y": 0.2588, "z": 0, "w": 0.9659 }
+    }
+  ],
+  "pinnedExpressions": [],
+  "view": { "observer_frame_id": "gm_world" }
+}

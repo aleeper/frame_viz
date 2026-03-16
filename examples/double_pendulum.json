@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "poses": [
+    {
+      "id": "dp_world",
+      "name": "World",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "quaternion": { "x": 0, "y": 0, "z": 0, "w": 1 }
+    },
+    {
+      "id": "dp_link1",
+      "name": "Link 1",
+      "parent_id": "dp_world",
+      "position": { "x": 0, "y": 2, "z": 0 },
+      "quaternion": { "x": 0, "y": 0, "z": 0, "w": 1 }
+    },
+    {
+      "id": "dp_link2",
+      "name": "Link 2",
+      "parent_id": "dp_link1",
+      "position": { "x": 0, "y": 2, "z": 0 },
+      "quaternion": { "x": 0, "y": 0, "z": 0, "w": 1 }
+    }
+  ],
+  "pinnedExpressions": [],
+  "view": { "observer_frame_id": "dp_world" }
+}

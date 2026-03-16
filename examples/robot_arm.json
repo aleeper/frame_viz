@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "poses": [
+    {
+      "id": "ra_world",
+      "name": "World",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "quaternion": { "x": 0, "y": 0, "z": 0, "w": 1 }
+    },
+    {
+      "id": "ra_base0",
+      "name": "Base",
+      "parent_id": "ra_world",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "quaternion": { "x": 0, "y": 0, "z": 0.3827, "w": 0.9239 }
+    },
+    {
+      "id": "ra_shldr",
+      "name": "Shoulder",
+      "parent_id": "ra_base0",
+      "position": { "x": 0, "y": 1, "z": 0 },
+      "quaternion": { "x": 0.2588, "y": 0, "z": 0, "w": 0.9659 }
+    },
+    {
+      "id": "ra_elbow",
+      "name": "Elbow",
+      "parent_id": "ra_shldr",
+      "position": { "x": 0, "y": 1.5, "z": 0 },
+      "quaternion": { "x": -0.1736, "y": 0, "z": 0, "w": 0.9848 }
+    },
+    {
+      "id": "ra_wrist",
+      "name": "Wrist",
+      "parent_id": "ra_elbow",
+      "position": { "x": 0, "y": 1, "z": 0 },
+      "quaternion": { "x": 0, "y": 0, "z": 0, "w": 1 }
+    }
+  ],
+  "pinnedExpressions": [
+    {
+      "id": "ra_pin01",
+      "base_frame_id": "ra_base0",
+      "target_frame_id": "ra_wrist",
+      "kind": "transform"
+    }
+  ],
+  "view": { "observer_frame_id": "ra_base0" }
+}

@@ -13,6 +13,16 @@ function expectPoseClose(actual: Pose, expected: Pose, decimals = 10) {
   expect(actual.quaternion.w).toBeCloseTo(expected.quaternion.w, decimals);
 }
 
+const SIN45 = Math.SQRT2 / 2;
+
+function makePose(
+  position: { x: number; y: number; z: number },
+  quaternion: { x: number; y: number; z: number; w: number },
+  id = '',
+): Pose {
+  return { id, position, quaternion };
+}
+
 const I = identity();
 
 // Sample poses used across multiple tests.
@@ -58,28 +68,23 @@ describe('multiply', () => {
       id: '', position: { x: 1, y: 0, z: 0 }, quaternion: { x: 0, y: 0, z: 0, w: 1 },
     };
     const result = multiply(rot90Z, localTranslation);
-    expect(result.position.x).toBeCloseTo(0, 10);
-    expect(result.position.y).toBeCloseTo(1, 10);
-    expect(result.position.z).toBeCloseTo(0, 10);
+    // quaternion should be unchanged from the left-side rotation
+    expectPoseClose(result, makePose({ x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: SIN45, w: SIN45 }));
   });
 
   it('rotation composition: 90°Z * 90°Z => 180°Z rotation', () => {
     const result = multiply(rot90Z, rot90Z);
-    // 180° around Z: q = (0, 0, 1, 0)
-    expect(result.quaternion.x).toBeCloseTo(0, 10);
-    expect(result.quaternion.y).toBeCloseTo(0, 10);
-    expect(result.quaternion.z).toBeCloseTo(1, 10);
-    expect(result.quaternion.w).toBeCloseTo(0, 10);
-    // Position stays at origin (both have zero translation)
-    expect(result.position.x).toBeCloseTo(0, 10);
-    expect(result.position.y).toBeCloseTo(0, 10);
-    expect(result.position.z).toBeCloseTo(0, 10);
+    // 180° around Z: q = (0, 0, 1, 0); position stays at origin
+    expectPoseClose(result, makePose({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1, w: 0 }));
   });
 });
 
 describe('invert', () => {
-  it('invert(identity) === identity', () => {
-    expectPoseClose(invert(I), I);
+  it('invert of pure rotation flips sign of quaternion xyz', () => {
+    const rot90Z = makePose({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: SIN45, w: SIN45 });
+    const inv = invert(rot90Z);
+    // conjugate: negate x,y,z; w unchanged; position stays zero
+    expectPoseClose(inv, makePose({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -SIN45, w: SIN45 }));
   });
 
   it('invert of pure translation {3,0,0} => {-3,0,0}', () => {
@@ -142,10 +147,7 @@ describe('composePath', () => {
     const C: Pose = { id: 'C', parent_id: 'B', position: { x: 0, y: 0, z: 1 }, quaternion: { x: 0, y: 0, z: 0, w: 1 } };
     const map = posesToMap([A, B, C]);
     const result = composePath('C', map);
-    expect(result.position.x).toBeCloseTo(1, 10);
-    expect(result.position.y).toBeCloseTo(1, 10);
-    expect(result.position.z).toBeCloseTo(1, 10);
-    expect(result.quaternion.w).toBeCloseTo(1, 10);
+    expectPoseClose(result, makePose({ x: 1, y: 1, z: 1 }, { x: 0, y: 0, z: 0, w: 1 }));
   });
 
   it('throws on unknown frameId', () => {

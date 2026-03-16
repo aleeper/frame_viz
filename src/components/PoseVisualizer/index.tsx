@@ -13,9 +13,13 @@ interface PoseVisualizerProps {
   upDirection: UpDirection;
   showWorldAxes?: boolean;
   showParentLines?: boolean;
+  frameScale?: number;
   observerFrameId?: string;
+  selectedFrameId?: string | null;
   onChange?: (newPoses: Poses) => void;
   onChangeCommit?: (newPoses: Poses) => void;
+  onSelectFrame?: (id: string) => void;
+  onDeselect?: () => void;
 }
 
 type FrameTransform = {
@@ -92,7 +96,23 @@ function computeDraggedPoses(
   return newPoses;
 }
 
-export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showParentLines = true, observerFrameId, onChange, onChangeCommit }: PoseVisualizerProps) {
+/** Compute which frame indices should NOT have gizmos.
+ * Observer is always excluded. If selectedId is null, all frames are excluded.
+ * If selectedId is set, all frames except the selected one are excluded.
+ */
+function computeNoGizmo(connectedPoses: { id: string }[], obsIdx: number, selectedId: string | null): Set<number> {
+  const noGizmo = new Set<number>();
+  if (obsIdx !== -1) noGizmo.add(obsIdx);
+  if (selectedId !== null) {
+    const selIdx = connectedPoses.findIndex(p => p.id === selectedId);
+    connectedPoses.forEach((_, i) => { if (i !== selIdx) noGizmo.add(i); });
+  } else {
+    connectedPoses.forEach((_, i) => noGizmo.add(i));
+  }
+  return noGizmo;
+}
+
+export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showParentLines = true, frameScale = 1, observerFrameId, selectedFrameId, onChange, onChangeCommit, onSelectFrame, onDeselect }: PoseVisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene>();
   const posesRef = useRef<Poses>(poses);
@@ -117,6 +137,19 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
   // TransformControls itself uses _quaternionStart / _positionStart.
   // Reset to null by onDragCommit so the next drag captures a fresh snapshot.
   const dragStartPosesRef = useRef<Poses | null>(null);
+  const frameScaleRef = useRef(frameScale);
+  frameScaleRef.current = frameScale;
+  const selectedFrameIdRef = useRef(selectedFrameId ?? null);
+  selectedFrameIdRef.current = selectedFrameId ?? null;
+  const onSelectFrameRef = useRef(onSelectFrame);
+  onSelectFrameRef.current = onSelectFrame;
+  const onDeselectRef = useRef(onDeselect);
+  onDeselectRef.current = onDeselect;
+  const interactionStateRef = useRef<InteractionState>('Off');
+  interactionStateRef.current = interactionState;
+  // Stable connected-poses snapshot for use in the selection effect.
+  const connectedPosesRef = useRef<Pose[]>([]);
+  const obsIdxRef = useRef(-1);
 
   useEffect(() => {
     if (import.meta.hot) {
@@ -190,6 +223,7 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
     const scene = new Scene(containerRef.current, upDirection, state ?? undefined);
     sceneRef.current = scene;
     scene.onInteractionStateChange = (s) => setInteractionState(s);
+    scene.onDeselect = () => onDeselectRef.current?.();
     scene.onUpAnimComplete = () => {
       cameraStateRef.current = scene.getCameraState();
       setSceneKey(k => k + 1);
@@ -234,6 +268,7 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
       const worldPose = { ...pose, position: observer_T_frame.position, quaternion: observer_T_frame.quaternion };
       const isObserver = pose.id === obsId;
       const frame = createFrame(worldPose, upDirection);
+      frame.scale.setScalar(frameScaleRef.current);
       // Observer has no gizmo (noGizmoIndices below), so () => {} is just explicit safety.
       scene.addFrame(frame, isObserver ? () => {} : handleTransformChange);
     });
@@ -251,10 +286,18 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
     }
     ancestorChildMapRef.current = ancestorChildMap;
 
-    // Only suppress the observer's own gizmo — ancestors get gizmos and use the
-    // ancestor-drag formula in computeDraggedPoses to update the child toward observer.
     const obsIdx = connectedPoses.findIndex(p => p.id === obsId);
-    scene.setNoGizmoIndices(obsIdx !== -1 ? new Set([obsIdx]) : new Set());
+    connectedPosesRef.current = connectedPoses;
+    obsIdxRef.current = obsIdx;
+    scene.setNoGizmoIndices(computeNoGizmo(connectedPoses, obsIdx, selectedFrameIdRef.current));
+    // Grid follows the tree root (the frame with no parent) so it stays at the
+    // "ground" reference regardless of which frame is the observer.
+    const rootIdx = connectedPoses.findIndex(p => !p.parent_id);
+    scene.setGridTargetFrame(rootIdx !== -1 ? rootIdx : null);
+    scene.onFrameSelect = (index) => {
+      const pose = connectedPosesRef.current[index];
+      if (pose) onSelectFrameRef.current?.(pose.id);
+    };
 
     // Add semi-transparent lines from each parent to its children.
     connectedPoses.forEach((pose, childIndex) => {
@@ -288,12 +331,13 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
       if (isKeyDown) return;
       if (!sceneRef.current) return;
       const scene = sceneRef.current;
+      if (event.key === 'Escape') {
+        onDeselectRef.current?.();
+        return;
+      }
       setInteractionState((prevState) => {
         let newInteractionState: InteractionState = prevState;
         switch (event.key.toLowerCase()) {
-          case 'q':
-            newInteractionState = "Off";
-            break;
           case 'w':
             newInteractionState = "Translate";
             break;
@@ -333,13 +377,43 @@ export function PoseVisualizer({ poses, upDirection, showWorldAxes = true, showP
     sceneRef.current.setParentLinesVisible(showParentLines);
   }, [showParentLines]);
 
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setFrameScale(frameScale);
+  }, [frameScale]);
+
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const scene = sceneRef.current;
+    const noGizmo = computeNoGizmo(connectedPosesRef.current, obsIdxRef.current, selectedFrameId ?? null);
+    scene.setNoGizmoIndices(noGizmo);
+    if (selectedFrameId != null) {
+      // Always show gizmo when a frame is selected.
+      // If mode is currently Off (e.g. after Escape then list-click), switch to last active mode.
+      if (interactionStateRef.current === 'Off') {
+        scene.activateLastMode();
+      } else {
+        scene.setInteractionState(interactionStateRef.current);
+      }
+    } else {
+      scene.setInteractionState('Off');
+    }
+  }, [selectedFrameId]);
+
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      <div className="absolute bottom-4 left-4 bg-gray-800 bg-opacity-80 p-2 rounded-lg">
-        <p className="text-sm text-white">
-          Q: Controls Off | W: Translate | E: Rotate | S: local vs global
-        </p>
+      <div className="absolute bottom-4 left-4 bg-gray-800 bg-opacity-80 px-3 py-1.5 rounded-lg">
+        {selectedFrameId != null ? (
+          <p className="text-xs text-gray-300">
+            <span className={interactionState === 'Translate' ? 'text-white font-semibold' : ''}>W: Translate</span>
+            {' · '}
+            <span className={interactionState === 'Rotate' ? 'text-white font-semibold' : ''}>E: Rotate</span>
+            {' · S: local/world · Esc: deselect'}
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500">Click a frame to select</p>
+        )}
       </div>
     </div>
   );

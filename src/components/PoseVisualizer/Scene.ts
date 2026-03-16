@@ -39,6 +39,10 @@ interface UpAnimState {
   gridEnd: number;        // ms from startTime (= gridAnimStart + GRID_DURATION)
   gridQuat0: THREE.Quaternion;
   gridQuat1: THREE.Quaternion;
+  // The exact target up-direction grid quaternion (no frame rotation component).
+  // Set on _upDirGridQuat just before upAnimState is cleared so updateGridPosition
+  // corrects the grid orientation on the same frame the animation ends.
+  targetUpDirGridQuat: THREE.Quaternion;
 }
 
 export class Scene {
@@ -56,6 +60,10 @@ export class Scene {
   private parentLinesGroup = new THREE.Group();
   private upAnimState: UpAnimState | null = null;
   private noGizmoIndices: Set<number> = new Set();
+  private gridTargetFrameIndex: number | null = null;
+  // The up-direction quaternion correction for the grid plane (no frame rotation).
+  // Updated immediately on direction change; drives updateGridPosition composition.
+  private _upDirGridQuat = new THREE.Quaternion();
 
   // Called when click interactions change the interaction mode.
   public onInteractionStateChange: ((state: InteractionState) => void) | null = null;
@@ -67,6 +75,12 @@ export class Scene {
   // PoseVisualizer uses this to save camera state and recreate the scene so
   // that OrbitControls is freshly initialised with the new up direction.
   public onUpAnimComplete: (() => void) | null = null;
+
+  // Called when the user clicks a frame (index into this.frames).
+  public onFrameSelect: ((frameIndex: number) => void) | null = null;
+
+  // Called when the user deselects (clicks empty space while active).
+  public onDeselect: (() => void) | null = null;
 
   constructor(container: HTMLElement, upDirection: UpDirection, cameraState?: CameraState) {
     this.scene = new THREE.Scene();
@@ -80,6 +94,7 @@ export class Scene {
     );
 
     this.setupScene();
+    this._upDirGridQuat.copy(Scene.upDirGridQuat(upDirection));
 
     if (cameraState) {
       // Restore camera from saved state (scene recreated after animation).
@@ -87,7 +102,7 @@ export class Scene {
       this.camera.up.copy(cameraState.up);
       this.camera.lookAt(cameraState.target);
       // Grid matches the new up direction (already reached by animation end).
-      this.gridHelper!.quaternion.copy(Scene.upDirGridQuat(upDirection));
+      this.gridHelper!.quaternion.copy(this._upDirGridQuat);
     } else {
       this.camera.position.set(5, 5, 5);
       this.camera.lookAt(0, 0, 0);
@@ -111,8 +126,10 @@ export class Scene {
     this.controls.onDeactivate = () => {
       this.setInteractionState('Off');
       this.onInteractionStateChange?.('Off');
+      this.onDeselect?.();
     };
     this.controls.onDragCommit = () => this.onDragCommit?.();
+    this.controls.onFrameSelect = (idx) => this.onFrameSelect?.(idx);
 
     this.animate();
   }
@@ -160,7 +177,8 @@ export class Scene {
 
   private applyUpDirectionImmediate(dir: UpDirection): void {
     this.camera.up.copy(Scene.upDirVec(dir));
-    this.gridHelper!.quaternion.copy(Scene.upDirGridQuat(dir));
+    this._upDirGridQuat.copy(Scene.upDirGridQuat(dir));
+    this.gridHelper!.quaternion.copy(this._upDirGridQuat);
   }
 
   // ─── Animated up-direction change ────────────────────────────────────────
@@ -261,6 +279,7 @@ export class Scene {
       gridEnd,
       gridQuat0,
       gridQuat1,
+      targetUpDirGridQuat: Scene.upDirGridQuat(upDirection),
     };
   }
 
@@ -303,6 +322,10 @@ export class Scene {
 
       // Fire when both camera.up roll and grid rotation are complete.
       if (elapsed >= Math.max(phase2End, gridEnd)) {
+        // Update _upDirGridQuat BEFORE clearing upAnimState so that
+        // updateGridPosition (which runs in the same frame) computes the correct
+        // composed quaternion, overwriting any fold-math error in gridQuat1.
+        this._upDirGridQuat.copy(this.upAnimState.targetUpDirGridQuat);
         this.controls.setOrbitEnabled(true);
         this.upAnimState = null;
         this.onUpAnimComplete?.();
@@ -324,31 +347,56 @@ export class Scene {
     this.controls.update();
     this.tickUpAnimation();
     this.updateParentLines();
+    this.updateGridPosition();
     this.renderer.render(this.scene, this.camera);
   };
 
+  private _composedGridQuat = new THREE.Quaternion();
+
+  private updateGridPosition(): void {
+    if (this.gridTargetFrameIndex === null) return;
+    const frame = this.frames[this.gridTargetFrameIndex];
+    if (!frame) return;
+    if (this.gridHelper) {
+      this.gridHelper.position.copy(frame.position);
+      // Only write grid quaternion when not animating; tickUpAnimation owns it during animation.
+      if (!this.upAnimState) {
+        this._composedGridQuat.multiplyQuaternions(frame.quaternion, this._upDirGridQuat);
+        this.gridHelper.quaternion.copy(this._composedGridQuat);
+      }
+    }
+    if (this.baseAxes) {
+      this.baseAxes.position.copy(frame.position);
+      this.baseAxes.quaternion.copy(frame.quaternion);
+    }
+  }
+
+  private _tubeUp = new THREE.Vector3(0, 1, 0);
+
   private updateParentLines(): void {
-    const children = this.parentLinesGroup.children as THREE.Line[];
-    children.forEach((line) => {
-      const userData = line.userData as { childIndex: number; parentIndex: number };
-      const child = this.frames[userData.childIndex];
-      const parent = this.frames[userData.parentIndex];
+    this.parentLinesGroup.children.forEach((obj) => {
+      const tube = obj as THREE.Mesh;
+      const { childIndex, parentIndex } = tube.userData as { childIndex: number; parentIndex: number };
+      const child = this.frames[childIndex];
+      const parent = this.frames[parentIndex];
       if (!child || !parent) return;
-      const attr = line.geometry.getAttribute('position') as THREE.BufferAttribute;
-      attr.setXYZ(0, parent.position.x, parent.position.y, parent.position.z);
-      attr.setXYZ(1, child.position.x, child.position.y, child.position.z);
-      attr.needsUpdate = true;
+      const dir = new THREE.Vector3().subVectors(child.position, parent.position);
+      const len = dir.length();
+      if (len < 1e-6) { tube.visible = false; return; }
+      tube.visible = true;
+      tube.position.addVectors(parent.position, child.position).multiplyScalar(0.5);
+      tube.quaternion.setFromUnitVectors(this._tubeUp, dir.divideScalar(len));
+      tube.scale.set(1, len, 1);
     });
   }
 
   public addParentLine(childIndex: number, parentIndex: number): void {
-    const positions = new Float32Array(6);
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const material = new THREE.LineBasicMaterial({ color: 0x999999, transparent: true, opacity: 0.45 });
-    const line = new THREE.Line(geometry, material);
-    line.userData = { childIndex, parentIndex };
-    this.parentLinesGroup.add(line);
+    // Thin tube mesh — scales along local Y at runtime to span parent→child.
+    const geo = new THREE.CylinderGeometry(0.012, 0.012, 1, 6);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.5 });
+    const tube = new THREE.Mesh(geo, mat);
+    tube.userData = { childIndex, parentIndex };
+    this.parentLinesGroup.add(tube);
   }
 
   public setParentLinesVisible(visible: boolean): void {
@@ -379,6 +427,20 @@ export class Scene {
 
   public setNoGizmoIndices(indices: Set<number>): void {
     this.noGizmoIndices = indices;
+  }
+
+  public setFrameScale(scale: number): void {
+    this.frames.forEach(f => f.scale.setScalar(scale));
+  }
+
+  public setGridTargetFrame(idx: number | null): void {
+    this.gridTargetFrameIndex = idx;
+  }
+
+  /** Switch to the last-used active mode (Translate or Rotate) and notify React. */
+  public activateLastMode(): void {
+    this.setInteractionState(this.lastActiveMode);
+    this.onInteractionStateChange?.(this.lastActiveMode);
   }
 
   public setInteractionState(interactionState: InteractionState) {

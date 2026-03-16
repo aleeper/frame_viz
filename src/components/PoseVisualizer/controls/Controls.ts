@@ -26,7 +26,7 @@ export class MyControls {
   private _pointerDownClientY = 0;
   private _hasDragged = false;
   private _wasInteractionActiveAtPointerDown = false;
-  private _frameHitAtPointerDown = false;
+  private _frameHitIndexAtPointerDown = -1;
 
   // Set by Scene to reflect the current interaction mode.
   public interactionActive = false;
@@ -40,6 +40,8 @@ export class MyControls {
   public onDeactivate: (() => void) | null = null;
   // Called once on pointer-up after a real drag completes (not a click).
   public onDragCommit: (() => void) | null = null;
+  // Called when a click selects a frame (fired before onActivate).
+  public onFrameSelect: ((frameIndex: number) => void) | null = null;
 
   constructor(camera: THREE.Camera, domElement: HTMLElement) {
     this.camera = camera;
@@ -101,17 +103,26 @@ export class MyControls {
     };
   }
 
-  // Returns true if the pointer ray hits the hit-zone geometry of any frame.
+  // Returns the index (into this.frames) of the closest hit frame, or -1 if none hit.
   // Each frame has an invisible 'hitZone' group with sized cylinder meshes
   // that define the precise clickable region for each axis.
-  private checkFrameHit(pointer: { x: number; y: number }): boolean {
-    if (this.frames.length === 0) return false;
+  private checkFrameHitIndex(pointer: { x: number; y: number }): number {
+    if (this.frames.length === 0) return -1;
     this._frameRaycaster.setFromCamera(new THREE.Vector2(pointer.x, pointer.y), this.camera);
-    return this.frames.some(frame => {
+    const camPos = new THREE.Vector3();
+    this.camera.getWorldPosition(camPos);
+    let closestIdx = -1;
+    let closestDist = Infinity;
+    this.frames.forEach((frame, idx) => {
       const hitZone = frame.getObjectByName('hitZone');
-      if (!hitZone) return false;
-      return this._frameRaycaster.intersectObject(hitZone, true).length > 0;
+      if (!hitZone) return;
+      if (this._frameRaycaster.intersectObject(hitZone, true).length === 0) return;
+      const framePos = new THREE.Vector3();
+      frame.getWorldPosition(framePos);
+      const dist = framePos.distanceTo(camPos);
+      if (dist < closestDist) { closestDist = dist; closestIdx = idx; }
     });
+    return closestIdx;
   }
 
   // Hover: update axis highlight, but only for the closest hit control.
@@ -168,11 +179,14 @@ export class MyControls {
     const pointer = this.getPointer(event);
 
     if (!this.interactionActive) {
-      // Record whether a frame was hit, but don't activate yet — wait for
+      // Record which frame was hit, but don't activate yet — wait for
       // pointer up so that orbit drags over a frame don't trigger activation.
-      this._frameHitAtPointerDown = this.checkFrameHit(pointer);
+      this._frameHitIndexAtPointerDown = this.checkFrameHitIndex(pointer);
       return;
     }
+
+    // Active mode: record frame hit for potential re-selection on click.
+    this._frameHitIndexAtPointerDown = this.checkFrameHitIndex(pointer);
 
     // Interaction is active — re-run hover so axis state reflects the exact
     // click position, then pick the closest hit control and start a drag.
@@ -213,6 +227,7 @@ export class MyControls {
   private _onPointerUp = (event: PointerEvent) => {
     this.domElement.releasePointerCapture(event.pointerId);
 
+    const hadActiveDrag = this.activeDragControl !== null;
     if (this.activeDragControl !== null) {
       this.activeDragControl.pointerUp(this.getPointer(event));
       if (this._hasDragged) {
@@ -221,13 +236,16 @@ export class MyControls {
       this.activeDragControl = null;
     }
 
-    if (!this._hasDragged) {
-      if (this._wasInteractionActiveAtPointerDown) {
-        // Click while active → deactivate.
-        this.onDeactivate?.();
-      } else if (this._frameHitAtPointerDown) {
-        // Click on a frame while inactive → activate.
+    // Skip click logic entirely if a gizmo was grabbed — the user was working
+    // with the gizmo (even if they didn't move), not clicking empty space.
+    if (!this._hasDragged && !hadActiveDrag) {
+      if (this._frameHitIndexAtPointerDown !== -1) {
+        // Click on a frame (active or inactive) → select it and activate.
+        this.onFrameSelect?.(this._frameHitIndexAtPointerDown);
         this.onActivate?.();
+      } else if (this._wasInteractionActiveAtPointerDown) {
+        // Click on empty space while active → deactivate.
+        this.onDeactivate?.();
       }
     }
 

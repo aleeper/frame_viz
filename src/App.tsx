@@ -90,8 +90,10 @@ function App() {
   const [viewMode, setViewMode] = useState<'panels' | 'yaml'>('panels');
   const [showWorldAxes, setShowWorldAxes] = useState(true);
   const [showParentLines, setShowParentLines] = useState(true);
+  const [frameScale, setFrameScale] = useState(1.0);
   const [reparentMode, setReparentMode] = useState<ReparentMode>('preserve world');
   const [rightPanel, setRightPanel] = useState<'pinned' | 'scene' | 'options' | null>('pinned');
+  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 
   const handleAdd = useCallback(() => {
     const usedNames = new Set(poses.map(p => p.name));
@@ -301,10 +303,12 @@ function App() {
                 representation={representation}
                 reparentMode={reparentMode}
                 observerFrameId={effectiveObserverFrameId}
+                selectedId={selectedFrameId}
                 onAdd={handleAdd}
                 onRemove={handleRemove}
                 onRename={handleRename}
                 onSetParent={handleSetParent}
+                onSelect={setSelectedFrameId}
               />
             </div>
           )}
@@ -320,7 +324,11 @@ function App() {
             upDirection={upDirection}
             showWorldAxes={showWorldAxes}
             showParentLines={showParentLines}
+            frameScale={frameScale}
             observerFrameId={effectiveObserverFrameId}
+            selectedFrameId={selectedFrameId}
+            onSelectFrame={setSelectedFrameId}
+            onDeselect={() => setSelectedFrameId(null)}
           />
           {/* Observer overlay — top-left of 3D viewport */}
           <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-gray-900 bg-opacity-75 rounded-lg px-2 py-1">
@@ -375,6 +383,8 @@ function App() {
                   onShowWorldAxesChange={setShowWorldAxes}
                   showParentLines={showParentLines}
                   onShowParentLinesChange={setShowParentLines}
+                  frameScale={frameScale}
+                  onFrameScaleChange={setFrameScale}
                 />
               )}
             </div>
@@ -383,14 +393,6 @@ function App() {
 
         {/* Activity bar */}
         <div className="w-8 bg-gray-800 border border-gray-700 rounded-lg shadow-lg flex flex-col items-center py-2 gap-1 shrink-0">
-          <button
-            title="Pinned expressions"
-            className={`w-6 h-6 flex items-center justify-center rounded transition-colors
-              ${rightPanel === 'pinned' ? 'bg-gray-700 text-blue-400' : 'text-gray-500 hover:text-gray-200'}`}
-            onClick={() => setRightPanel(p => p === 'pinned' ? null : 'pinned')}
-          >
-            ⇄
-          </button>
           <button
             title="Load / save scene"
             className={`w-6 h-6 flex items-center justify-center rounded transition-colors
@@ -406,6 +408,14 @@ function App() {
             onClick={() => setRightPanel(p => p === 'options' ? null : 'options')}
           >
             <Settings className="w-3.5 h-3.5" />
+          </button>
+          <button
+            title="Pinned expressions"
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors
+              ${rightPanel === 'pinned' ? 'bg-gray-700 text-blue-400' : 'text-gray-500 hover:text-gray-200'}`}
+            onClick={() => setRightPanel(p => p === 'pinned' ? null : 'pinned')}
+          >
+            ⇄
           </button>
         </div>
       </main>

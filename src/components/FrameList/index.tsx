@@ -24,10 +24,12 @@ interface FrameListProps {
   representation: Representation;
   reparentMode: ReparentMode;
   observerFrameId?: string;
+  selectedId?: string | null;
   onAdd?: () => void;
   onRemove?: (id: string) => void;
   onRename?: (id: string, name: string | undefined) => void;
   onSetParent?: (id: string, parentId: string | undefined) => void;
+  onSelect?: (id: string | null) => void;
 }
 
 export function FrameList({
@@ -35,10 +37,12 @@ export function FrameList({
   representation,
   reparentMode,
   observerFrameId,
+  selectedId,
   onAdd,
   onRemove,
   onRename,
   onSetParent,
+  onSelect,
 }: FrameListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const displayList = buildDisplayList(poses);
@@ -77,10 +81,17 @@ export function FrameList({
           >
             {/* Row header */}
             <div
-              className="flex items-center gap-1 px-2 py-1 bg-gray-800 rounded cursor-pointer hover:bg-gray-700 border border-gray-700"
-              onClick={() => toggleExpand(pose.id)}
+              className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer border transition-colors ${
+                selectedId === pose.id
+                  ? 'bg-blue-900 border-blue-600 hover:bg-blue-800'
+                  : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
+              }`}
+              onClick={() => onSelect?.(selectedId === pose.id ? null : pose.id)}
             >
-              <span className="text-gray-400 text-xs w-3">{isExpanded ? '▼' : '▶'}</span>
+              <span
+                className="text-gray-400 text-xs w-3 hover:text-white shrink-0"
+                onClick={e => { e.stopPropagation(); toggleExpand(pose.id); }}
+              >{isExpanded ? '▼' : '▶'}</span>
               <span className="flex-1 font-medium text-gray-100 truncate">{displayName}</span>
               {disconnectedIds.has(pose.id) && (
                 <span

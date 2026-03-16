@@ -19,48 +19,28 @@ export function createTextCanvas(text: string) {
 export function createFrame(pose: Pose, upDirection: UpDirection = "Y") {
   const frame = new THREE.Group();
 
-  // Create a single arrow for each axis with thicker lines
   const axisLength = 1;
-  const headLength = 0.2;
-  const headWidth = 0.1;
+  const shaftRadius = 0.025;
 
-  // X axis (red)
-  const xArrow = new THREE.ArrowHelper(
-    new THREE.Vector3(1, 0, 0),
-    new THREE.Vector3(0, 0, 0),
-    axisLength,
-    0xff0000,
-    headLength,
-    headWidth
-  );
+  const makeShaft = (color: number, quat: THREE.Quaternion) => {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(shaftRadius, shaftRadius, axisLength, 8),
+      new THREE.MeshLambertMaterial({ color })
+    );
+    mesh.position.y = axisLength / 2;
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.quaternion.copy(quat);
+    return group;
+  };
 
-  // Y axis (green)
-  const yArrow = new THREE.ArrowHelper(
-    new THREE.Vector3(0, 1, 0),
-    new THREE.Vector3(0, 0, 0),
-    axisLength,
-    0x00ff00,
-    headLength,
-    headWidth
-  );
+  const xQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+  const yQuat = new THREE.Quaternion();
+  const zQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 
-  // Z axis (blue)
-  const zArrow = new THREE.ArrowHelper(
-    new THREE.Vector3(0, 0, 1),
-    new THREE.Vector3(0, 0, 0),
-    axisLength,
-    0x0000ff,
-    headLength,
-    headWidth
-  );
-
-  // Make the lines thicker
-  [xArrow, yArrow, zArrow].forEach(arrow => {
-    const line = arrow.line as THREE.Line;
-    (line.material as THREE.LineBasicMaterial).linewidth = 2;
-  });
-
-  frame.add(xArrow, yArrow, zArrow);
+  frame.add(makeShaft(0xff3333, xQuat));
+  frame.add(makeShaft(0x33ff33, yQuat));
+  frame.add(makeShaft(0x3333ff, zQuat));
 
   // Invisible hit-zone cylinders for each axis.
   // Positive extent matches the arrow length (1.0); negative extent is half
@@ -122,22 +102,15 @@ export function createFrame(pose: Pose, upDirection: UpDirection = "Y") {
 }
 
 export function createBaseAxes(axisLength: number = 5) {
-  const shaftRadius = 0.01;
-  const headLength = 0.4;
-  const headRadius = 0.12;
-  const shaftLength = axisLength - headLength;
+  const shaftRadius = 0.015;
 
   const makeAxis = (color: number, quat: THREE.Quaternion) => {
     const mat = new THREE.MeshLambertMaterial({ color });
     const group = new THREE.Group();
 
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 8), mat);
-    shaft.position.y = shaftLength / 2;
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(shaftRadius, shaftRadius, axisLength, 8), mat);
+    shaft.position.y = axisLength / 2;
     group.add(shaft);
-
-    const head = new THREE.Mesh(new THREE.ConeGeometry(headRadius, headLength, 8), mat);
-    head.position.y = shaftLength + headLength / 2;
-    group.add(head);
 
     group.quaternion.copy(quat);
     return group;

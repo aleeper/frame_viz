@@ -3,8 +3,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
+  base: command === 'build' ? '/frame_viz/' : '/',
   test: {
     globals: true,
     environment: 'node',
@@ -13,7 +14,6 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
-  base: '/frame_viz/',
   build: {
     rollupOptions: {
       output: {
@@ -30,4 +30,4 @@ export default defineConfig({
       ignored: ['**/docs/**', '**/.superpowers/**'],
     },
   },
-});
+}));

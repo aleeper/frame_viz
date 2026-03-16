@@ -37,7 +37,7 @@ A `Pose` is an SE(3) rigid transform with the following fields:
 
 Frames form a tree via `parent_id`. A child's transform is expressed relative to its parent. The utility `composePath` walks the ancestor chain to compute the root-relative pose of any frame.
 
-There is no implicit global frame — the root of the tree (the frame with no `parent_id`) serves as the reference for world-space composition.
+There is no implicit global frame — the root of the tree (the frame with no `parent_id`) serves as the reference for root-relative composition.
 
 The default scene contains:
 - **World** — root frame (no parent)

@@ -13,7 +13,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
-  base: '/frame_viz',
+  base: '/frame_viz/',
   build: {
     rollupOptions: {
       output: {

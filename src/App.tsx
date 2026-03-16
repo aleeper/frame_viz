@@ -57,6 +57,7 @@ const defaultPinnedExpressions: PinnedExpression[] = [
 function App() {
   const { snapshot, set, undo, redo, canUndo, canRedo } =
     useUndoRedo<AppSnapshot>({
+      version: 1,
       poses: defaultPoses,
       pinnedExpressions: defaultPinnedExpressions,
       view: { observer_frame_id: WORLD_ID },

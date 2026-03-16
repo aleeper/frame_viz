@@ -3,7 +3,6 @@
 A standalone browser tool for authoring and visualizing rigid-body coordinate frame hierarchies in 3D. Useful for robotics, multibody dynamics, and spatial reasoning.
 
 ![frame_viz screenshot](docs/screenshot.png)
-<!-- Replace with an actual screenshot -->
 
 **Live demo:** https://aleeper.github.io/frame_viz
 
@@ -36,7 +35,7 @@ A `Pose` is an SE(3) rigid transform with the following fields:
 
 ### Frame tree
 
-Frames form a tree via `parent_id`. A child's transform is expressed relative to its parent. The utility `composePath` walks the ancestor chain to compute the world-space pose of any frame.
+Frames form a tree via `parent_id`. A child's transform is expressed relative to its parent. The utility `composePath` walks the ancestor chain to compute the root-relative pose of any frame.
 
 There is no implicit global frame — the root of the tree (the frame with no `parent_id`) serves as the reference for world-space composition.
 
@@ -74,9 +73,10 @@ Frames that are not connected to the observer's subtree (disconnected components
 | `Q` | Disable gizmo (no transform control) |
 | `W` | Enable translate gizmo |
 | `E` | Enable rotate gizmo |
+| `S` | Toggle gizmo between local and world space |
 | Click + drag gizmo | Move the selected frame |
 | `Ctrl+Z` | Undo |
-| `Ctrl+Shift+Z` | Redo |
+| `Ctrl+Shift+Z` or `Ctrl+Y` | Redo |
 
 ---
 

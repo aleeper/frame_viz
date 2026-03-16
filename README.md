@@ -2,7 +2,7 @@
 
 A standalone browser tool for authoring and visualizing rigid-body coordinate frame hierarchies in 3D. Useful for robotics, multibody dynamics, and spatial reasoning.
 
-![frame_viz screenshot](docs/screenshot.png)
+<!-- Screenshot: add docs/screenshot.png to show the UI here -->
 
 **Live demo:** https://aleeper.github.io/frame_viz
 

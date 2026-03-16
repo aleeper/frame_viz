@@ -191,7 +191,7 @@ function App() {
   useEffect(() => {
     if (import.meta.hot) {
       import.meta.hot.accept(() => {
-        set({ poses: defaultPoses }); // Reset poses to ensure reinitialization.
+        set({ version: 1, poses: defaultPoses, pinnedExpressions: defaultPinnedExpressions, view: { observer_frame_id: WORLD_ID } });
       });
     }
   }, []);

@@ -62,11 +62,29 @@ describe('multiply', () => {
     expect(result.position.y).toBeCloseTo(1, 10);
     expect(result.position.z).toBeCloseTo(0, 10);
   });
+
+  it('rotation composition: 90°Z * 90°Z => 180°Z rotation', () => {
+    const result = multiply(rot90Z, rot90Z);
+    // 180° around Z: q = (0, 0, 1, 0)
+    expect(result.quaternion.x).toBeCloseTo(0, 10);
+    expect(result.quaternion.y).toBeCloseTo(0, 10);
+    expect(result.quaternion.z).toBeCloseTo(1, 10);
+    expect(result.quaternion.w).toBeCloseTo(0, 10);
+    // Position stays at origin (both have zero translation)
+    expect(result.position.x).toBeCloseTo(0, 10);
+    expect(result.position.y).toBeCloseTo(0, 10);
+    expect(result.position.z).toBeCloseTo(0, 10);
+  });
 });
 
 describe('invert', () => {
   it('invert(identity) === identity', () => {
     expectPoseClose(invert(I), I);
+  });
+
+  it('invert of pure translation {3,0,0} => {-3,0,0}', () => {
+    const t: Pose = { id: '', position: { x: 3, y: 0, z: 0 }, quaternion: { x: 0, y: 0, z: 0, w: 1 } };
+    expectPoseClose(invert(t), { id: '', position: { x: -3, y: 0, z: 0 }, quaternion: { x: 0, y: 0, z: 0, w: 1 } });
   });
 
   it('multiply(a_T_b, invert(a_T_b)) === identity', () => {
@@ -128,6 +146,11 @@ describe('composePath', () => {
     expect(result.position.y).toBeCloseTo(1, 10);
     expect(result.position.z).toBeCloseTo(1, 10);
     expect(result.quaternion.w).toBeCloseTo(1, 10);
+  });
+
+  it('throws on unknown frameId', () => {
+    const map = posesToMap([]);
+    expect(() => composePath('nonexistent', map)).toThrow('nonexistent');
   });
 
   it('throws on missing parent_id reference', () => {

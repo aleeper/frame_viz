@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PlatformProps } from './types/PlatformProps';
 import { JsonEditor } from './components/JsonEditor';
 import { DropdownControl } from './components/DropdownControl';
 import { FrameList, ReparentMode } from './components/FrameList';
@@ -56,16 +57,29 @@ const defaultPinnedExpressions: PinnedExpression[] = [
   },
 ];
 
-function App() {
+function App({
+  currentScene = null,
+  initialSnapshot,
+  readOnly = false,
+  onSnapshotChange,
+  onFork,
+  renderSceneLibrary,
+  renderSaveArea,
+}: PlatformProps = {}) {
   const { snapshot, set, undo, redo, canUndo, canRedo } =
-    useUndoRedo<AppSnapshot>({
-      version: 1,
-      poses: defaultPoses,
-      pinnedExpressions: defaultPinnedExpressions,
-      view: { observer_frame_id: WORLD_ID },
-    });
+    useUndoRedo<AppSnapshot>(
+      initialSnapshot ?? {
+        version: 1,
+        poses: defaultPoses,
+        pinnedExpressions: defaultPinnedExpressions,
+        view: { observer_frame_id: WORLD_ID },
+      }
+    );
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
+  useEffect(() => {
+    onSnapshotChange?.(snapshot);
+  }, [snapshot, onSnapshotChange]);
   const [dragPoses, setDragPoses] = useState<Poses | null>(null);
   const poses = dragPoses ?? snapshot.poses;
   const effectiveObserverFrameId = (() => {
@@ -92,7 +106,9 @@ function App() {
   const [showParentLines, setShowParentLines] = useState(true);
   const [frameScale, setFrameScale] = useState(1.0);
   const [reparentMode, setReparentMode] = useState<ReparentMode>('preserve world');
-  const [rightPanel, setRightPanel] = useState<'pinned' | 'scene' | 'options' | null>('pinned');
+  const [rightPanel, setRightPanel] = useState<'pinned' | 'scene' | 'options' | null>(
+    renderSceneLibrary ? 'scene' : 'pinned'
+  );
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
 
   const handleAdd = useCallback(() => {
@@ -222,6 +238,11 @@ function App() {
         <div className="container mx-auto flex items-center">
           <LayoutGrid className="w-6 h-6 mr-2" />
           <h1 className="text-xl font-bold">3D Pose Visualizer</h1>
+          {readOnly && (
+            <span className="ml-3 text-xs bg-gray-600 text-gray-300 px-2 py-0.5 rounded">
+              View only
+            </span>
+          )}
           <div className="flex-grow"></div>
           <div className="flex items-center gap-1">
             <button
@@ -243,6 +264,11 @@ function App() {
               <Redo2 className="w-4 h-4" />
             </button>
           </div>
+          {renderSaveArea && (
+            <div className="ml-4 flex items-center">
+              {renderSaveArea()}
+            </div>
+          )}
 
         </div>
 
@@ -319,8 +345,8 @@ function App() {
         <div className="flex-1 min-w-0 overflow-hidden bg-gray-800 rounded-lg shadow-lg relative">
           <PoseVisualizer
             poses={poses}
-            onChange={handleDragChange}
-            onChangeCommit={handleDragCommit}
+            onChange={readOnly ? undefined : handleDragChange}
+            onChangeCommit={readOnly ? undefined : handleDragCommit}
             upDirection={upDirection}
             showWorldAxes={showWorldAxes}
             showParentLines={showParentLines}
@@ -370,10 +396,12 @@ function App() {
                 />
               )}
               {rightPanel === 'scene' && (
-                <ScenePanel
-                  snapshot={snapshot}
-                  onLoad={handleLoadScene}
-                />
+                renderSceneLibrary ? renderSceneLibrary() : (
+                  <ScenePanel
+                    snapshot={snapshot}
+                    onLoad={handleLoadScene}
+                  />
+                )
               )}
               {rightPanel === 'options' && (
                 <OptionsPanel
